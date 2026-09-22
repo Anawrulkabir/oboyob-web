@@ -53,15 +53,26 @@ export async function verifyCode(_prev: AuthState, form: FormData): Promise<Auth
   redirect(safeNext(form.get("next")));
 }
 
-export async function signInWithFacebook(form: FormData) {
+const OAUTH_PROVIDERS = ["google", "facebook"] as const;
+export type OAuthProvider = (typeof OAUTH_PROVIDERS)[number];
+
+/** Google / Facebook via Supabase's built-in OAuth providers. */
+export async function signInWithOAuth(form: FormData) {
+  const provider = OAUTH_PROVIDERS.find((p) => p === form.get("provider"));
+  const next = safeNext(form.get("next"));
+  if (!provider) redirect(`/login?next=${encodeURIComponent(next)}`);
   const sb = await createSessionClient();
   const origin = (await headers()).get("origin") ?? site.url;
-  const next = safeNext(form.get("next"));
   const { data, error } = await sb.auth.signInWithOAuth({
-    provider: "facebook",
-    options: { redirectTo: `${origin}/auth/callback?next=${encodeURIComponent(next)}`, scopes: "email" },
+    provider,
+    options: {
+      redirectTo: `${origin}/auth/callback?provider=${provider}&next=${encodeURIComponent(next)}`,
+      ...(provider === "facebook"
+        ? { scopes: "email" }
+        : { queryParams: { prompt: "select_account" } }), // let shared-phone users pick their Google account
+    },
   });
-  if (error || !data.url) redirect(`/login?error=facebook&next=${encodeURIComponent(next)}`);
+  if (error || !data.url) redirect(`/login?error=${provider}&next=${encodeURIComponent(next)}`);
   redirect(data.url);
 }
 

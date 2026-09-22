@@ -16,7 +16,7 @@ export default async function LoginPage({ searchParams }: Props) {
       <h1 className="text-3xl">লগইন</h1>
       <p className="mt-2 mb-8 text-ink-soft">অর্ডার ট্র্যাক করুন, আর পরের বার ঠিকানা লিখতে হবে না।</p>
       {isSupabaseConfigured ? (
-        <LoginPanel next={safeNext} phone={authFeatures.phone} facebook={authFeatures.facebook} error={error} />
+        <LoginPanel next={safeNext} phone={authFeatures.phone} google={authFeatures.google} facebook={authFeatures.facebook} error={error} />
       ) : (
         <p className="text-sindoor">লগইন এখনও চালু হয়নি।</p>
       )}

@@ -3,5 +3,6 @@
 export const authFeatures = {
   email: true,
   phone: process.env.NEXT_PUBLIC_AUTH_PHONE === "1",       // needs an SMS provider in Supabase Auth
+  google: process.env.NEXT_PUBLIC_AUTH_GOOGLE === "1",     // needs a Google OAuth client + Supabase provider
   facebook: process.env.NEXT_PUBLIC_AUTH_FACEBOOK === "1", // needs a Meta app + Supabase provider
 };
