@@ -67,7 +67,10 @@ export async function sendEmail(to: string, subject: string, html: string, attac
         secure: port === 465,
         auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS!.replace(/\s+/g, "") }, // Google shows app passwords with spaces
       });
-      await transport.sendMail({ from, to, subject, html, attachments: attachments.map((a) => ({ filename: a.filename, content: a.content })) });
+      await transport.sendMail({
+        from, to, subject, html, text: htmlToText(html), replyTo: from,
+        attachments: attachments.map((a) => ({ filename: a.filename, content: a.content, contentType: "application/pdf" })),
+      });
       return { ok: true };
     }
     let r: Response;
@@ -76,7 +79,7 @@ export async function sendEmail(to: string, subject: string, html: string, attac
         method: "POST",
         headers: { "api-key": process.env.BREVO_API_KEY, "Content-Type": "application/json", accept: "application/json" },
         body: JSON.stringify({
-          sender: parseFrom(from), to: [{ email: to }], subject, htmlContent: html,
+          sender: parseFrom(from), to: [{ email: to }], subject, htmlContent: html, textContent: htmlToText(html),
           ...(attachments.length && { attachment: attachments.map((a) => ({ name: a.filename, content: a.content.toString("base64") })) }),
         }),
       });
@@ -85,7 +88,7 @@ export async function sendEmail(to: string, subject: string, html: string, attac
         method: "POST",
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from, to, subject, html,
+          from, to, subject, html, text: htmlToText(html),
           ...(attachments.length && { attachments: attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }),
         }),
       });
@@ -103,6 +106,22 @@ export async function sendEmail(to: string, subject: string, html: string, attac
       return { ok: false, error: "Gmail rejected the login. Use a 16-letter App Password (not your normal password) in SMTP_PASS, and SMTP_USER must be that Gmail address." };
     return { ok: false, error: err.message };
   }
+}
+
+/**
+ * Plain-text copy of an email. Sending HTML with a matching text part is one
+ * of the things spam filters look for.
+ */
+function htmlToText(html: string): string {
+  return html
+    .replace(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href: string, label: string) => `${label.replace(/<[^>]+>/g, "").trim()}: ${href}`)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|tr|table|div)>/gi, "\n")
+    .replace(/<\/td>/gi, "  ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 async function email(to: string, subject: string, html: string) {
