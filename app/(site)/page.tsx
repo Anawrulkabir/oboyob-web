@@ -31,7 +31,7 @@ export default async function HomePage() {
         <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-4 lg:gap-x-8">
           {CATEGORIES.map((c) => {
             const list = inCategory(c.slug);
-            return <CategoryCard key={c.slug} category={c} count={list.length} cover={list.find((p) => p.images.length > 0)} />;
+            return <CategoryCard key={c.slug} category={c} count={list.length} cover={list.find((p) => p.available && p.images.length > 0) ?? list.find((p) => p.images.length > 0)} />;
           })}
         </div>
       </section>

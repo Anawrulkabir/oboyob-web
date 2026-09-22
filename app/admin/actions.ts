@@ -44,7 +44,7 @@ export async function signOut() {
 export interface ProductFormState {
   status: "idle" | "saved" | "error";
   message?: string;
-  errors?: Partial<Record<"name" | "slug" | "category" | "price" | "specifications", string>>;
+  errors?: Partial<Record<"name" | "slug" | "category" | "price" | "stock" | "specifications", string>>;
 }
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -67,6 +67,7 @@ export async function saveProduct(id: string | null, _prev: ProductFormState, fo
   const slug = String(form.get("slug") ?? "").trim().toLowerCase();
   const category = String(form.get("category") ?? "");
   const priceRaw = String(form.get("price") ?? "").trim();
+  const stockRaw = String(form.get("stock") ?? "").trim();
   const specs = parseSpecs(String(form.get("specifications") ?? ""));
 
   const errors: ProductFormState["errors"] = {};
@@ -75,6 +76,9 @@ export async function saveProduct(id: string | null, _prev: ProductFormState, fo
   if (!id && !getCategory(category)) errors.category = "ক্যাটাগরি বাছাই করুন।";
   const price = priceRaw === "" ? null : Number(priceRaw);
   if (price !== null && (!Number.isInteger(price) || price < 0)) errors.price = "পূর্ণ টাকায় লিখুন (যেমন 1250), অথবা খালি রাখুন।";
+  const stock = Number(stockRaw);
+  if (stockRaw === "" || !Number.isInteger(stock) || stock < 0 || stock > 100000)
+    errors.stock = "কতটি পিস আছে লিখুন (যেমন 5)। শেষ হলে 0।";
   if (!specs) errors.specifications = "প্রতি লাইনে Label: Value ফরম্যাটে লিখুন।";
   if (Object.keys(errors).length) return { status: "error", errors, message: "চিহ্নিত ঘরগুলো ঠিক করুন।" };
 
@@ -86,7 +90,7 @@ export async function saveProduct(id: string | null, _prev: ProductFormState, fo
     features: String(form.get("features") ?? "").split("\n").map((l) => l.trim()).filter(Boolean),
     specifications: specs,
     price,
-    available: form.get("available") === "on",
+    stock, // available (in stock / sold out) is derived from this in the database
     featured: form.get("featured") === "on",
   };
 
@@ -111,10 +115,20 @@ function dbError(error: { code?: string; message?: string } | null): ProductForm
   return { status: "error", message: `সংরক্ষণ হয়নি: ${error?.message ?? "অজানা ত্রুটি"}` };
 }
 
-export async function setProductFlag(id: string, field: "available" | "featured" | "archived", value: boolean) {
+export async function setProductFlag(id: string, field: "featured" | "archived", value: boolean) {
   const { sb } = await requireAdmin();
   const patch = field === "archived" && value ? { archived: true, featured: false } : { [field]: value };
   const { error } = await sb.from("products").update(patch).eq("id", id);
+  if (error) throw new Error(error.message);
+  refreshSite();
+}
+
+/** Quick stock update from the product list. */
+export async function setProductStock(id: string, form: FormData) {
+  const { sb } = await requireAdmin();
+  const stock = Number(String(form.get("stock") ?? "").trim());
+  if (!Number.isInteger(stock) || stock < 0 || stock > 100000) return;
+  const { error } = await sb.from("products").update({ stock }).eq("id", id);
   if (error) throw new Error(error.message);
   refreshSite();
 }
@@ -187,9 +201,12 @@ export async function setOrderStatus(orderId: string, form: FormData) {
   const status = String(form.get("status"));
   if (!(ORDER_STATUSES as readonly string[]).includes(status)) return;
   const { data: before } = await sb.from("orders").select("status").eq("id", orderId).single();
+  // Cancelling puts the pieces back in stock (orders_restock trigger, 0004_stock.sql).
   const { data: order, error } = await sb.from("orders").update({ status }).eq("id", orderId).select("*").single();
+  if (error?.message.includes("OUT_OF_STOCK")) redirect("/admin/orders?error=restock");
   if (error || !order) throw new Error(error?.message ?? "update failed");
   revalidatePath("/admin/orders");
+  if (before?.status !== status && (status === "cancelled" || before?.status === "cancelled")) refreshSite();
   // Tell the customer (email/SMS if configured) — only when the status actually changed.
   if (before?.status !== status) after(() => notifyStatusChange(order as OrderInfo, status as OrderStatus));
 }

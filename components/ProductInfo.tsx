@@ -19,7 +19,7 @@ export default function ProductInfo({ product }: { product: Product }) {
 
       <div className="mt-6 flex flex-wrap items-baseline gap-x-6 gap-y-2">
         <Price value={product.price} className="text-2xl" />
-        <Availability available={product.available} className="text-sm" />
+        <Availability available={product.available} stock={product.stock} className="text-sm" />
       </div>
       <p className="mt-2 text-sm text-ink-soft">
         প্রোডাক্ট কোড: <span className="tabular-nums text-ink">{product.product_code}</span>
@@ -31,7 +31,7 @@ export default function ProductInfo({ product }: { product: Product }) {
         {product.available ? (
           <a href="#order" className="bg-ink px-6 py-3 text-center text-paper hover:bg-ink/85">Order Now</a>
         ) : (
-          <span className="border border-line px-6 py-3 text-center text-ink-soft">বর্তমানে স্টক শেষ</span>
+          <span className="border border-sindoor/50 px-6 py-3 text-center text-sindoor">Sold out — এই মুহূর্তে বিক্রি শেষ</span>
         )}
         <a
           href={site.facebook}

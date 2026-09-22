@@ -30,6 +30,7 @@ export const MOCK_PRODUCTS: Product[] = [
       { label: "Delivery", value: "All over Bangladesh" },
     ],
     price: null, // not provided — do not invent
+    stock: 3,
     available: true,
     featured: true,
     images: [

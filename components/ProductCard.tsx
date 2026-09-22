@@ -21,7 +21,7 @@ export default function ProductCard({ product, priority }: { product: Product; p
           <h3 className="mt-0.5 text-lg group-hover:text-haldi">{product.name}</h3>
           <div className="mt-1 flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
             <Price value={product.price} />
-            <Availability available={product.available} className="text-xs" />
+            <Availability available={product.available} stock={product.stock} className="text-xs" />
           </div>
         </div>
       </Link>

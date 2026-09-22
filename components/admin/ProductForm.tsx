@@ -58,6 +58,10 @@ export default function ProductForm({ product }: { product?: Product }) {
         <Field label="দাম (৳)" hint="পূর্ণ টাকায়। খালি রাখলে “দাম জানতে মেসেজ করুন” দেখাবে।" error={e.price}>
           <input name="price" inputMode="numeric" defaultValue={product?.price ?? ""} className={adminInput} aria-invalid={!!e.price} />
         </Field>
+        <Field label="স্টক (কতটি পিস আছে)" hint="প্রতিটি অর্ডারে নিজে থেকে কমবে; 0 হলে সাইটে “Sold out” দেখাবে। অর্ডার বাতিল করলে ফেরত আসবে।" error={e.stock}>
+          <input name="stock" type="number" min={0} step={1} inputMode="numeric" required
+            defaultValue={product?.stock ?? ""} placeholder="যেমন 5" className={adminInput} aria-invalid={!!e.stock} />
+        </Field>
       </div>
 
       <Field label="বর্ণনা" hint="প্রথম অনুচ্ছেদ উপরে দেখায়। অনুচ্ছেদের মাঝে একটি খালি লাইন দিন।">
@@ -80,10 +84,6 @@ export default function ProductForm({ product }: { product?: Product }) {
       </div>
 
       <div className="flex flex-wrap gap-6">
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="available" defaultChecked={product?.available ?? true} className="h-4 w-4 accent-ink" />
-          স্টকে আছে
-        </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" name="featured" defaultChecked={product?.featured ?? false} className="h-4 w-4 accent-ink" />
           হোমপেজে ফিচার্ড

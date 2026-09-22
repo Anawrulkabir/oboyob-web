@@ -6,7 +6,7 @@ import { MOCK_PRODUCTS } from "@/lib/mock-products";
 
 export const PRODUCT_SELECT = `
   id, product_code, slug, name, subtitle, category, description,
-  features, specifications, price, available, featured, archived, created_at, updated_at,
+  features, specifications, price, stock, available, featured, archived, created_at, updated_at,
   images:product_images ( id, image_url, alt_text, sort_order )
 `;
 
@@ -40,7 +40,7 @@ const loadCatalog = unstable_cache(
     if (error) throw new Error(`Failed to load products: ${error.message}`);
     return (data as unknown as Product[]).map(normalizeProduct);
   },
-  ["catalog"],
+  ["catalog-v2"], // bump when PRODUCT_SELECT changes, so old cached rows are never served
   { revalidate: CATALOG_TTL, tags: [PRODUCTS_TAG] },
 );
 
@@ -63,7 +63,7 @@ export const getProductBySlug = cache(
       if (error) throw new Error(`Failed to load product: ${error.message}`);
       return data ? normalizeProduct(data as unknown as Product) : null;
     },
-    ["product-by-slug"],
+    ["product-by-slug-v2"],
     { revalidate: CATALOG_TTL, tags: [PRODUCTS_TAG] },
   ),
 );

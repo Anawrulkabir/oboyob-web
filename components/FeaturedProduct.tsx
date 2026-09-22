@@ -15,7 +15,7 @@ export default function FeaturedProduct({ product }: { product: Product }) {
           <h2 id="featured-title" className="mt-2 text-3xl sm:text-4xl">{product.name}</h2>
           <div className="mt-4 flex items-baseline gap-5">
             <Price value={product.price} className="text-lg" />
-            <Availability available={product.available} className="text-sm" />
+            <Availability available={product.available} stock={product.stock} className="text-sm" />
           </div>
           {lead && <p className="mt-6 text-ink-soft">{lead}</p>}
           {product.features.length > 0 && (

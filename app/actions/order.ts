@@ -1,7 +1,8 @@
 "use server";
 
 import { after } from "next/server";
-import { getProductBySlug } from "@/lib/products";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { getProductBySlug, PRODUCTS_TAG } from "@/lib/products";
 import { getServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createSessionClient } from "@/lib/supabase/session";
 import { normalizeBdPhone, toAsciiDigits } from "@/lib/phone";
@@ -41,7 +42,7 @@ export async function submitOrder(_prev: OrderState, form: FormData): Promise<Or
 
   const product = await getProductBySlug(slug);
   if (!product) return { status: "error", message: "পণ্যটি পাওয়া যায়নি। পেজটি রিফ্রেশ করে আবার চেষ্টা করুন।" };
-  if (!product.available) return { status: "error", message: "পণ্যটি এই মুহূর্তে স্টকে নেই।" };
+  if (!product.available) return { status: "error", message: "দুঃখিত, পণ্যটি বিক্রি শেষ (Sold out)।" };
 
   const db = getServiceClient();
   if (!db) return { status: "error", message: "অনলাইন অর্ডার এখনও চালু হয়নি। Facebook পেজে মেসেজ করে অর্ডার করুন।" };
@@ -57,12 +58,6 @@ export async function submitOrder(_prev: OrderState, form: FormData): Promise<Or
   const customerEmail = emailRaw || userEmail;
 
   const row = {
-    product_id: product.id,
-    product_code: product.product_code,
-    product_name: product.name,
-    unit_price: product.price,
-    quantity,
-    customer_id: userId,
     customer_name: name.slice(0, 120),
     customer_phone: phone!,
     customer_address: address.slice(0, 500),
@@ -70,11 +65,31 @@ export async function submitOrder(_prev: OrderState, form: FormData): Promise<Or
     note: note || null,
   };
 
-  const { data, error } = await db.from("orders").insert(row).select("id").single();
-  if (error || !data) {
-    console.error("order insert failed", error);
+  // Stock is taken and the order inserted in one database transaction (0004_stock.sql).
+  const { data: order, error } = await db.rpc("place_order", {
+    p_product_id: product.id,
+    p_quantity: quantity,
+    p_customer_id: userId,
+    p_customer_name: row.customer_name,
+    p_customer_phone: row.customer_phone,
+    p_customer_address: row.customer_address,
+    p_customer_email: row.customer_email,
+    p_note: row.note,
+  });
+  if (error || !order) {
+    const left = error?.message.match(/OUT_OF_STOCK:(\d+)/)?.[1];
+    if (left !== undefined) {
+      refreshCatalog();
+      const n = Number(left);
+      return n > 0
+        ? { status: "error", errors: { quantity: `মাত্র ${n.toLocaleString("bn-BD")}টি স্টকে আছে।` }, message: "পরিমাণ কমিয়ে আবার চেষ্টা করুন।" }
+        : { status: "error", message: "দুঃখিত, পণ্যটি এইমাত্র বিক্রি শেষ (Sold out) হয়ে গেছে।" };
+    }
+    console.error("place_order failed", error);
     return { status: "error", message: "অর্ডার পাঠানো যায়নি। আবার চেষ্টা করুন, অথবা Facebook পেজে মেসেজ করুন।" };
   }
+  const data = order as OrderInfo;
+  refreshCatalog(); // stock changed — sold-out badges must show right away
 
   // Remember delivery details on the account for next time.
   if (userId) {
@@ -82,8 +97,7 @@ export async function submitOrder(_prev: OrderState, form: FormData): Promise<Or
   }
 
   // Notifications run after the response is sent — the customer never waits on them.
-  const info: OrderInfo = { id: data.id, ...row };
-  after(() => notifyNewOrder(info));
+  after(() => notifyNewOrder(data));
 
   return {
     status: "success",
@@ -92,4 +106,9 @@ export async function submitOrder(_prev: OrderState, form: FormData): Promise<Or
     emailed: !!customerEmail && !!process.env.RESEND_API_KEY,
     message: "আপনার অর্ডার পেয়েছি।",
   };
+}
+
+function refreshCatalog() {
+  revalidateTag(PRODUCTS_TAG);
+  revalidatePath("/", "layout");
 }

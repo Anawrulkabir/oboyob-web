@@ -11,6 +11,8 @@ interface Props {
   productName: string;
   productCode: string;
   price: number | null;
+  /** Pieces in stock — the most one order can take. */
+  stock: number;
 }
 
 type Fields = { name: string; phone: string; address: string; email: string; note: string };
@@ -20,7 +22,8 @@ const SAVED = "oboyob:checkout";
 const input =
   "mt-1.5 w-full border border-line bg-paper px-3 py-3 text-[16px] outline-none focus:border-ink aria-[invalid=true]:border-sindoor";
 
-export default function OrderForm({ slug, productName, productCode, price }: Props) {
+export default function OrderForm({ slug, productName, productCode, price, stock }: Props) {
+  const maxQty = Math.max(1, Math.min(20, stock));
   const [state, action, pending] = useActionState<OrderState, FormData>(submitOrder, { status: "idle" });
   const [f, setF] = useState<Fields>(EMPTY);
   const [qty, setQty] = useState(1);
@@ -72,6 +75,18 @@ export default function OrderForm({ slug, productName, productCode, price }: Pro
   }, [state]);
 
   const total = price != null ? formatPrice(price * qty) : null;
+
+  if (stock <= 0 && state.status !== "success") {
+    return (
+      <div className="border border-sindoor/40 p-5">
+        <p className="font-display text-xl text-sindoor">Sold out — এই মুহূর্তে বিক্রি শেষ</p>
+        <p className="mt-1 text-[15px] text-ink-soft">
+          আবার কবে আসবে জানতে{" "}
+          <a href={site.facebook} target="_blank" rel="noopener noreferrer" className="text-ink underline underline-offset-4">Facebook পেজে মেসেজ করুন</a>।
+        </p>
+      </div>
+    );
+  }
 
   if (state.status === "success") {
     return (
@@ -135,10 +150,10 @@ export default function OrderForm({ slug, productName, productCode, price }: Pro
         </div>
         <div className="flex shrink-0 items-stretch border border-line bg-paper">
           <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-10 text-lg hover:bg-paper-deep" aria-label="পরিমাণ কমান">−</button>
-          <input name="quantity" type="number" min={1} max={20} value={qty} aria-label="পরিমাণ" aria-invalid={!!e.quantity}
-            onChange={(ev) => setQty(Math.min(20, Math.max(1, Number(ev.target.value) || 1)))}
+          <input name="quantity" type="number" min={1} max={maxQty} value={qty} aria-label="পরিমাণ" aria-invalid={!!e.quantity}
+            onChange={(ev) => setQty(Math.min(maxQty, Math.max(1, Number(ev.target.value) || 1)))}
             className="w-11 border-x border-line bg-paper py-2 text-center tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />
-          <button type="button" onClick={() => setQty((q) => Math.min(20, q + 1))} className="w-10 text-lg hover:bg-paper-deep" aria-label="পরিমাণ বাড়ান">+</button>
+          <button type="button" onClick={() => setQty((q) => Math.min(maxQty, q + 1))} disabled={qty >= maxQty} className="w-10 text-lg hover:bg-paper-deep disabled:opacity-30" aria-label="পরিমাণ বাড়ান">+</button>
         </div>
       </div>
       {e.quantity && <p className="-mt-3 text-sm text-sindoor">{e.quantity}</p>}

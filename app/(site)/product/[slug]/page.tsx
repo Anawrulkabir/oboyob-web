@@ -73,13 +73,15 @@ export default async function ProductPage({ params }: Props) {
           <ProductInfo product={product} />
           <ProductSpecifications specs={product.specifications} />
 
-          {product.available && (
-            <section id="order" aria-labelledby="order-title" className="scroll-mt-24 border-t border-ink/80 pt-6">
-              <h2 id="order-title" className="text-2xl">অর্ডার করুন</h2>
-              <p className="mt-1 mb-6 text-sm text-ink-soft">তথ্য দিন, আমরা ফোন করে কনফার্ম করব।</p>
-              <OrderForm slug={product.slug} productName={product.name} productCode={product.product_code} price={product.price} />
-            </section>
-          )}
+          {/* Always mounted: ordering the last piece re-renders this page as sold out,
+              and the form must keep showing the customer's confirmation. */}
+          <section id="order" aria-labelledby="order-title" className="scroll-mt-24 border-t border-ink/80 pt-6">
+            <h2 id="order-title" className="text-2xl">অর্ডার করুন</h2>
+            <p className="mt-1 mb-6 text-sm text-ink-soft">
+              {product.available ? "তথ্য দিন, আমরা ফোন করে কনফার্ম করব।" : "এই পণ্যটি আবার স্টকে এলে অর্ডার করা যাবে।"}
+            </p>
+            <OrderForm slug={product.slug} productName={product.name} productCode={product.product_code} price={product.price} stock={product.stock} />
+          </section>
         </div>
       </div>
       {product.available && <StickyOrderBar name={product.name} price={formatPrice(product.price) ?? PRICE_ON_REQUEST} />}

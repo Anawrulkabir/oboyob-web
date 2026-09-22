@@ -5,8 +5,8 @@ import { requireAdmin } from "@/lib/admin";
 import { PRODUCT_SELECT, normalizeProduct } from "@/lib/products";
 import { CATEGORIES, getCategory } from "@/lib/categories";
 import { formatPrice } from "@/lib/format";
-import { setProductFlag } from "@/app/admin/actions";
-import { btnPrimary, btnQuiet } from "@/components/admin/styles";
+import { setProductFlag, setProductStock } from "@/app/admin/actions";
+import { adminInput, btnPrimary, btnQuiet } from "@/components/admin/styles";
 import type { Product } from "@/types/product";
 
 type Props = { searchParams: Promise<{ category?: string; show?: string; q?: string }> };
@@ -81,10 +81,11 @@ export default async function ProductsAdmin({ searchParams }: Props) {
                   </form>
                 ) : (
                   <>
-                    <form action={setProductFlag.bind(null, p.id, "available", !p.available)}>
-                      <SubmitButton className={`${btnQuiet} ${p.available ? "!text-leaf" : "!text-sindoor"}`}>
-                        {p.available ? "● স্টকে আছে" : "○ স্টক শেষ"}
-                      </SubmitButton>
+                    <form action={setProductStock.bind(null, p.id)} className="flex items-center gap-1" title="স্টক — কতটি পিস আছে">
+                      <span className={`text-sm ${p.available ? "text-leaf" : "text-sindoor"}`}>{p.available ? "● স্টক" : "○ Sold out"}</span>
+                      <input name="stock" type="number" min={0} step={1} defaultValue={p.stock} aria-label={`${p.name} — স্টক`}
+                        className={`${adminInput} !mt-0 !w-16 !px-2 !py-1 text-center text-sm tabular-nums`} />
+                      <SubmitButton className={btnQuiet}>✓</SubmitButton>
                     </form>
                     <form action={setProductFlag.bind(null, p.id, "featured", !p.featured)}>
                       <SubmitButton className={`${btnQuiet} ${p.featured ? "!border-haldi !text-haldi" : ""}`}>

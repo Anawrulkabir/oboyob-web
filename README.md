@@ -13,7 +13,8 @@ and the order form tells customers to message on Facebook.
 
 ## Supabase
 1. SQL editor → run, in order: migrations/0001_init.sql, 0002_admin.sql,
-   0003_customers.sql, then seed.sql.
+   0003_customers.sql, 0004_stock.sql, then seed.sql.
+   Already live? Just run 0004_stock.sql, then set each product's stock in /admin.
 2. Set the price (seeded as NULL — not provided):
    update products set price = <TAKA> where product_code = 'OB-C-001';
 3. Photos: public Storage bucket "products" → upload → insert into product_images
@@ -34,6 +35,11 @@ What it does:
   restore; permanent delete (archived only).
 - Product codes are assigned by the database on create (next OB-X-NNN for the
   category) and cannot be changed. Category is fixed after creation.
+- Stock: every product has a piece count (required). Each order takes from it
+  in the same database transaction, so the last piece can't be sold twice.
+  At 0 the shop shows "Sold out" and ordering stops; ≤3 shows "মাত্র Nটি বাকি".
+  Cancelling an order puts its pieces back. Edit stock on the product page or
+  right in the product list.
 - Images: multi-upload straight to Supabase Storage (phone photos are resized
   in the browser), reorder, set main image, alt text, delete.
 - Orders: list, filter by status, update status, tap-to-call.

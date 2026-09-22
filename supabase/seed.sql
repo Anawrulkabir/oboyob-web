@@ -13,8 +13,9 @@ on conflict (slug) do update set
 -- price is left NULL on purpose; the site shows "দাম জানতে মেসেজ করুন".
 -- Set it before launch:
 --   update products set price = <TAKA> where product_code = 'OB-C-001';
+-- Run after all migrations (stock comes from 0004_stock.sql).
 insert into products
-  (product_code, slug, name, subtitle, category, description, features, specifications, price, available, featured)
+  (product_code, slug, name, subtitle, category, description, features, specifications, price, stock, featured)
 values (
   'OB-C-001',
   'saptapadi',
@@ -40,7 +41,7 @@ values (
     {"label": "Delivery",        "value": "All over Bangladesh"}
   ]'::jsonb,
   null,
-  true,
+  1,     -- pieces in stock: set the real count in the admin dashboard
   true
 )
 on conflict (product_code) do nothing;

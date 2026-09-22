@@ -24,6 +24,9 @@ export interface Product {
   specifications: ProductSpec[];
   /** BDT, whole taka. null = price not set yet. */
   price: number | null;
+  /** Pieces left. Orders take from it; 0 = sold out. */
+  stock: number;
+  /** Derived in the database: stock > 0. */
   available: boolean;
   featured: boolean;
   archived?: boolean;

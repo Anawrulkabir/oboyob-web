@@ -6,7 +6,7 @@ import { ORDER_STATUSES, ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/orde
 import { formatPrice } from "@/lib/format";
 import { btnQuiet } from "@/components/admin/styles";
 
-type Props = { searchParams: Promise<{ status?: string }> };
+type Props = { searchParams: Promise<{ status?: string; error?: string }> };
 
 interface Order {
   id: string; product_id: string | null; product_code: string; product_name: string; unit_price: number | null;
@@ -18,7 +18,7 @@ const dateFmt = new Intl.DateTimeFormat("bn-BD", { dateStyle: "medium", timeStyl
 
 export default async function OrdersAdmin({ searchParams }: Props) {
   const { sb } = await requireAdmin();
-  const { status } = await searchParams;
+  const { status, error: actionError } = await searchParams;
   const valid = (ORDER_STATUSES as readonly string[]).includes(status ?? "");
 
   let q = sb.from("orders").select("*").order("created_at", { ascending: false }).limit(200);
@@ -38,6 +38,9 @@ export default async function OrdersAdmin({ searchParams }: Props) {
         ))}
       </div>
 
+      {actionError === "restock" && (
+        <p role="alert" className="mt-6 text-sindoor">বাতিল অর্ডারটি ফেরানো যায়নি — পণ্যটির যথেষ্ট স্টক নেই। আগে পণ্যের স্টক বাড়ান।</p>
+      )}
       {error && <p className="mt-6 text-sindoor">লোড করা যায়নি: {error.message}</p>}
       {orders.length === 0 ? (
         <p className="mt-10 border-t border-line pt-10 text-center text-ink-soft">কোনো অর্ডার নেই।</p>
