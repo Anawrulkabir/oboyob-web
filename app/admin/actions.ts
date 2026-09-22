@@ -255,9 +255,15 @@ export async function sendOrderEmail(orderId: string, _prev: EmailState, form: F
   if (!subject || !message) return { status: "error", message: "Subject and message can't be empty." };
 
   const attach = form.get("attach") === "on";
-  const attachments = attach
-    ? [{ filename: `oboyob-slip-${orderRef(order.id)}.pdf`, content: await renderSlipPdf(order) }]
-    : [];
+  const attachments = [];
+  if (attach) {
+    try {
+      attachments.push({ filename: `oboyob-slip-${orderRef(order.id)}.pdf`, content: await renderSlipPdf(order) });
+    } catch (e) {
+      console.error("slip pdf", order.id, e);
+      return { status: "error", message: "Couldn't create the PDF slip, so nothing was sent. Untick “Attach payment slip” to send without it, or try again." };
+    }
+  }
   const html = emailHtml(message, order,
     `<p style="margin-top:18px"><a href="${slipUrl(order)}" style="display:inline-block;background:#231f1b;color:#fbf8f2;padding:10px 18px;text-decoration:none">View payment slip online</a></p>`);
   const r = await sendEmail(to, subject, html, attachments);
