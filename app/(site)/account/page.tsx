@@ -23,6 +23,10 @@ export default async function AccountPage() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) redirect("/login?next=/account");
 
+  // Admins signing in through the customer login (e.g. Google) go to the dashboard.
+  const { data: admin } = await sb.from("admins").select("user_id").eq("user_id", user.id).maybeSingle();
+  if (admin) redirect("/admin");
+
   const [{ data: profile }, { data: orders }] = await Promise.all([
     sb.from("profiles").select("full_name, phone, email, address").eq("id", user.id).maybeSingle(),
     sb.from("orders")
