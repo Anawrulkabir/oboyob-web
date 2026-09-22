@@ -1,17 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Hind_Siliguri, Noto_Serif_Bengali } from "next/font/google";
+import { Noto_Sans_Bengali, Tiro_Bangla } from "next/font/google";
 import { site } from "@/lib/site";
 import NavProgress from "@/components/NavProgress";
 import "./globals.css";
 
-const serif = Noto_Serif_Bengali({
+// Tiro Bangla: a calligraphic Bangla serif for headings (single weight — never faux-bold it).
+const serif = Tiro_Bangla({
   subsets: ["bengali", "latin"],
-  weight: ["400", "500", "600"],
+  weight: "400",
   variable: "--font-serif-bn",
   display: "swap",
 });
 
-const sans = Hind_Siliguri({
+// Noto Sans Bengali: clean, even strokes at small sizes on phone screens.
+const sans = Noto_Sans_Bengali({
   subsets: ["bengali", "latin"],
   weight: ["400", "500", "600"],
   variable: "--font-sans-bn",
