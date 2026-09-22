@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SubmitButton from "@/components/SubmitButton";
 import { requireAdmin } from "@/lib/admin";
 import { setOrderStatus } from "@/app/admin/actions";
 import { ORDER_STATUSES, ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/order-status";
@@ -64,7 +65,7 @@ export default async function OrdersAdmin({ searchParams }: Props) {
                   <select name="status" defaultValue={o.status} className="border border-line bg-paper px-2 py-1.5 text-sm">
                     {ORDER_STATUSES.map((s) => <option key={s} value={s}>{ORDER_STATUS_LABEL[s]}</option>)}
                   </select>
-                  <button className={btnQuiet}>আপডেট</button>
+                  <SubmitButton className={btnQuiet} pendingText="আপডেট হচ্ছে…">আপডেট</SubmitButton>
                 </form>
               </li>
             );

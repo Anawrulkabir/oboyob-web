@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SubmitButton from "@/components/SubmitButton";
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { PRODUCT_SELECT, normalizeProduct } from "@/lib/products";
@@ -49,7 +50,7 @@ export default async function EditProduct({ params, searchParams }: Props) {
         {product.archived ? (
           <div className="mt-4 flex flex-wrap gap-3">
             <form action={setProductFlag.bind(null, product.id, "archived", false)}>
-              <button className={btnQuiet}>ফিরিয়ে আনুন</button>
+              <SubmitButton className={btnQuiet}>ফিরিয়ে আনুন</SubmitButton>
             </form>
             <ConfirmButton
               action={deleteProductPermanently.bind(null, product.id)}
@@ -63,7 +64,7 @@ export default async function EditProduct({ params, searchParams }: Props) {
           <>
             <p className="mt-1 text-sm text-ink-soft">আর্কাইভ করলে সাইট থেকে সরে যাবে, কিন্তু কোড ও অর্ডারের ইতিহাস থাকবে।</p>
             <form action={setProductFlag.bind(null, product.id, "archived", true)} className="mt-4">
-              <button className={`${btnQuiet} !text-sindoor`}>আর্কাইভ করুন</button>
+              <SubmitButton className={`${btnQuiet} !text-sindoor`}>আর্কাইভ করুন</SubmitButton>
             </form>
           </>
         )}

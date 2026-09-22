@@ -1,4 +1,5 @@
 import Image from "next/image";
+import SubmitButton from "@/components/SubmitButton";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin";
 import { PRODUCT_SELECT, normalizeProduct } from "@/lib/products";
@@ -76,19 +77,19 @@ export default async function ProductsAdmin({ searchParams }: Props) {
               <div className="col-span-2 flex flex-wrap gap-2 md:col-span-1 md:justify-end">
                 {archived ? (
                   <form action={setProductFlag.bind(null, p.id, "archived", false)}>
-                    <button className={btnQuiet}>ফিরিয়ে আনুন</button>
+                    <SubmitButton className={btnQuiet}>ফিরিয়ে আনুন</SubmitButton>
                   </form>
                 ) : (
                   <>
                     <form action={setProductFlag.bind(null, p.id, "available", !p.available)}>
-                      <button className={`${btnQuiet} ${p.available ? "!text-leaf" : "!text-sindoor"}`}>
+                      <SubmitButton className={`${btnQuiet} ${p.available ? "!text-leaf" : "!text-sindoor"}`}>
                         {p.available ? "● স্টকে আছে" : "○ স্টক শেষ"}
-                      </button>
+                      </SubmitButton>
                     </form>
                     <form action={setProductFlag.bind(null, p.id, "featured", !p.featured)}>
-                      <button className={`${btnQuiet} ${p.featured ? "!border-haldi !text-haldi" : ""}`}>
+                      <SubmitButton className={`${btnQuiet} ${p.featured ? "!border-haldi !text-haldi" : ""}`}>
                         {p.featured ? "★ ফিচার্ড" : "☆ ফিচার্ড"}
-                      </button>
+                      </SubmitButton>
                     </form>
                     <Link href={`/product/${p.slug}`} target="_blank" className={btnQuiet}>দেখুন</Link>
                   </>

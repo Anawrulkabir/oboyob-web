@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import type { CategorySlug, Product } from "@/types/product";
 import { getPublicClient } from "@/lib/supabase/server";
 import { MOCK_PRODUCTS } from "@/lib/mock-products";
@@ -25,17 +26,27 @@ function sortCatalog(list: Product[]): Product[] {
   );
 }
 
+/** Cache tag for catalog reads; admin saves call revalidateTag(PRODUCTS_TAG). */
+export const PRODUCTS_TAG = "products";
+const CATALOG_TTL = 300; // seconds, same as the pages' revalidate
+
+// The whole catalog is small, so fetch it once and filter in memory: every
+// category tab on /shop is then served from Next's data cache, not Supabase.
+const loadCatalog = unstable_cache(
+  async (): Promise<Product[]> => {
+    const db = getPublicClient();
+    if (!db) return MOCK_PRODUCTS;
+    const { data, error } = await db.from("products").select(PRODUCT_SELECT).order("created_at", { ascending: false });
+    if (error) throw new Error(`Failed to load products: ${error.message}`);
+    return (data as unknown as Product[]).map(normalizeProduct);
+  },
+  ["catalog"],
+  { revalidate: CATALOG_TTL, tags: [PRODUCTS_TAG] },
+);
+
 export async function getProducts(opts: { category?: CategorySlug } = {}): Promise<Product[]> {
-  const db = getPublicClient();
-  if (!db) {
-    const list = opts.category ? MOCK_PRODUCTS.filter((p) => p.category === opts.category) : MOCK_PRODUCTS;
-    return sortCatalog(list);
-  }
-  let q = db.from("products").select(PRODUCT_SELECT);
-  if (opts.category) q = q.eq("category", opts.category);
-  const { data, error } = await q.order("created_at", { ascending: false });
-  if (error) throw new Error(`Failed to load products: ${error.message}`);
-  return sortCatalog((data as unknown as Product[]).map(normalizeProduct));
+  const all = await loadCatalog();
+  return sortCatalog(opts.category ? all.filter((p) => p.category === opts.category) : all);
 }
 
 export async function getFeaturedProduct(): Promise<Product | null> {
@@ -43,13 +54,19 @@ export async function getFeaturedProduct(): Promise<Product | null> {
   return all.find((p) => p.featured) ?? all[0] ?? null;
 }
 
-export const getProductBySlug = cache(async (slug: string): Promise<Product | null> => {
-  const db = getPublicClient();
-  if (!db) return MOCK_PRODUCTS.find((p) => p.slug === slug) ?? null;
-  const { data, error } = await db.from("products").select(PRODUCT_SELECT).eq("slug", slug).maybeSingle();
-  if (error) throw new Error(`Failed to load product: ${error.message}`);
-  return data ? normalizeProduct(data as unknown as Product) : null;
-});
+export const getProductBySlug = cache(
+  unstable_cache(
+    async (slug: string): Promise<Product | null> => {
+      const db = getPublicClient();
+      if (!db) return MOCK_PRODUCTS.find((p) => p.slug === slug) ?? null;
+      const { data, error } = await db.from("products").select(PRODUCT_SELECT).eq("slug", slug).maybeSingle();
+      if (error) throw new Error(`Failed to load product: ${error.message}`);
+      return data ? normalizeProduct(data as unknown as Product) : null;
+    },
+    ["product-by-slug"],
+    { revalidate: CATALOG_TTL, tags: [PRODUCTS_TAG] },
+  ),
+);
 
 export async function getProductCounts(): Promise<Record<CategorySlug, number>> {
   const counts: Record<CategorySlug, number> = { sharee: 0, jewellery: 0, combo: 0, "3pics": 0 };

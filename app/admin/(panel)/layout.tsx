@@ -1,4 +1,5 @@
 import Image from "next/image";
+import SubmitButton from "@/components/SubmitButton";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/admin";
 import { signOut } from "@/app/admin/actions";
@@ -24,7 +25,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
           </nav>
           <form action={signOut} className="ml-auto flex items-center gap-3 text-sm text-ink-soft">
             <span className="hidden sm:inline">{user.email}</span>
-            <button className="underline underline-offset-4 hover:text-ink">লগআউট</button>
+            <SubmitButton className="underline underline-offset-4 hover:text-ink">লগআউট</SubmitButton>
           </form>
         </div>
       </header>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import SubmitButton from "@/components/SubmitButton";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabase } from "@/lib/supabase/browser";
@@ -84,7 +85,7 @@ export default function ImageManager({ productId, productName, images }: {
             <div className="space-y-2 p-2">
               <form action={updateAltText.bind(null, img.id)} className="flex gap-1">
                 <input name="alt" defaultValue={img.alt_text ?? ""} placeholder="ছবির বিবরণ (alt)" className={`${adminInput} !mt-0 !py-1 text-sm`} />
-                <button className={btnQuiet} title="বিবরণ সংরক্ষণ">✓</button>
+                <SubmitButton className={btnQuiet} title="বিবরণ সংরক্ষণ">✓</SubmitButton>
               </form>
               <div className="flex flex-wrap gap-1">
                 {i > 0 && <button type="button" disabled={busy} onClick={() => run(() => moveImage(productId, img.id, "first"))} className={btnQuiet}>মূল করুন</button>}

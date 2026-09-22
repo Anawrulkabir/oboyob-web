@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Hind_Siliguri, Noto_Serif_Bengali } from "next/font/google";
 import { site } from "@/lib/site";
+import NavProgress from "@/components/NavProgress";
 import "./globals.css";
 
 const serif = Noto_Serif_Bengali({
@@ -37,7 +38,10 @@ export const viewport: Viewport = { themeColor: "#fbf8f2" };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="bn" className={`${serif.variable} ${sans.variable}`}>
-      <body className="flex min-h-dvh flex-col antialiased">{children}</body>
+      <body className="flex min-h-dvh flex-col antialiased">
+        <NavProgress />
+        {children}
+      </body>
     </html>
   );
 }

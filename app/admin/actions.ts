@@ -1,16 +1,20 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { notifyStatusChange, type OrderInfo } from "@/lib/notify";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { createSessionClient } from "@/lib/supabase/session";
 import { getCategory } from "@/lib/categories";
+import { PRODUCTS_TAG } from "@/lib/products";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/order-status";
 import type { ProductSpec } from "@/types/product";
 
-const refreshSite = () => revalidatePath("/", "layout");
+const refreshSite = () => {
+  revalidateTag(PRODUCTS_TAG);
+  revalidatePath("/", "layout");
+};
 
 // ------------------------------------------------------------------ auth
 export interface LoginState { error?: string }

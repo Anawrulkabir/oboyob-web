@@ -7,6 +7,7 @@ import { signOutCustomer } from "@/app/actions/auth";
 import { ORDER_STATUS_LABEL, ORDER_STATUSES, type OrderStatus } from "@/lib/order-status";
 import { formatPrice } from "@/lib/format";
 import ProfileForm from "@/components/ProfileForm";
+import SubmitButton from "@/components/SubmitButton";
 
 export const metadata: Metadata = { title: "আমার অ্যাকাউন্ট", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export default async function AccountPage() {
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <h1 className="text-3xl">{profile?.full_name ? `স্বাগতম, ${profile.full_name}` : "আমার অ্যাকাউন্ট"}</h1>
         <form action={signOutCustomer}>
-          <button className="text-sm text-ink-soft underline underline-offset-4 hover:text-ink">লগআউট</button>
+          <SubmitButton className="text-sm text-ink-soft underline underline-offset-4 hover:text-ink" pendingText="লগআউট হচ্ছে…">লগআউট</SubmitButton>
         </form>
       </div>
       <p className="mt-1 text-sm text-ink-soft">{user.email || profile?.phone}</p>
