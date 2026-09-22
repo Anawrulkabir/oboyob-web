@@ -106,6 +106,9 @@ export async function renderSlipPdf(o: Order): Promise<Buffer> {
   const { files } = L;
   const doc = new PDFDocument({
     size: "A4", margin: 0,
+    // Start in our own font: pdfkit's default (Helvetica) is read from data
+    // files that serverless bundles tend to leave out.
+    font: path.join(FONT_DIR, FONTS.regular),
     info: { Title: `Payment slip #${orderRef(o.id)}`, Author: site.nameEn, Subject: "Payment slip" },
   });
   doc.registerFont("regular", files.regular);
