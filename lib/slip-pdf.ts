@@ -20,7 +20,7 @@ type Weight = keyof typeof FONTS;
 const C = { ink: "#231f1b", soft: "#6b6157", line: "#e3d9c8", paper: "#fbf8f2", deep: "#f3ece0", haldi: "#a8742a", leaf: "#4f6a3d" };
 
 interface Shaper { font: HB.Font; upem: number }
-interface Loaded { hb: typeof HB; files: Record<Weight, Buffer>; shapers: Record<Weight, Shaper> }
+interface Loaded { hb: typeof HB; files: Record<Weight, Buffer>; shapers: Record<Weight, Shaper>; logo: Buffer }
 let loaded: Promise<Loaded> | null = null;
 
 // harfbuzzjs is an ES module that awaits its WebAssembly at load time, so it
@@ -36,7 +36,8 @@ function load(): Promise<Loaded> {
       const face = new hb.Face(new hb.Blob(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer));
       return { font: new hb.Font(face), upem: face.upem };
     };
-    return { hb, files, shapers: { regular: make(files.regular), bold: make(files.bold) } };
+    const logo = fs.readFileSync(path.join(process.cwd(), "assets", "brand", "logo.png"));
+    return { hb, files, logo, shapers: { regular: make(files.regular), bold: make(files.bold) } };
   })());
 }
 
@@ -125,8 +126,8 @@ export async function renderSlipPdf(o: Order): Promise<Buffer> {
   // ---- header band
   doc.rect(0, 0, W, 118).fill(C.deep);
   doc.rect(0, 0, W, 5).fill(C.haldi);
-  const logo = path.join(process.cwd(), "public", "images", "logo.png");
-  if (fs.existsSync(logo)) doc.image(logo, M, 30, { width: 58, height: 58 });
+  // A copy of the logo lives in assets/ — public/ isn't shipped with server functions on Vercel.
+  doc.image(L.logo, M, 30, { width: 58, height: 58 });
   text(L, doc, site.nameEn.toUpperCase(), M + 72, 36, { size: 20, weight: "bold" });
   text(L, doc, site.tagline, M + 72, 62, { size: 9.5, color: C.soft });
   text(L, doc, site.url.replace(/^https?:\/\//, ""), M + 72, 76, { size: 9.5, color: C.soft });

@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 // Files the slip PDF reads from disk at runtime, which build tracing misses.
 const SLIP_FILES = [
   "./assets/fonts/**",
-  "./public/images/logo.png",
+  "./assets/brand/**",
   "./node_modules/harfbuzzjs/dist/*.wasm",
   "./node_modules/pdfkit/js/data/**",
 ];
