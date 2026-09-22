@@ -5,6 +5,7 @@
  *   Seller:   Telegram (free, instant push)  +  email
  *   Customer: email (English, like the payment slip)  +  SMS via any HTTP gateway (optional)
  */
+import nodemailer from "nodemailer";
 import { site } from "@/lib/site";
 import type { OrderStatus } from "@/lib/order-status";
 import { deliveryZone } from "@/lib/delivery";
@@ -39,19 +40,36 @@ function parseFrom(from: string) {
 
 export interface Attachment { filename: string; content: Buffer }
 
-export const emailConfigured = () => !!process.env.EMAIL_FROM && !!(process.env.BREVO_API_KEY || process.env.RESEND_API_KEY);
+const smtpConfigured = () => !!(process.env.SMTP_USER && process.env.SMTP_PASS);
+/** Sender: EMAIL_FROM, or the SMTP login itself (Gmail only sends as the signed-in address). */
+const fromAddress = () => process.env.EMAIL_FROM || (smtpConfigured() ? `${site.nameEn} <${process.env.SMTP_USER}>` : "");
+
+export const emailConfigured = () =>
+  smtpConfigured() || (!!process.env.EMAIL_FROM && !!(process.env.BREVO_API_KEY || process.env.RESEND_API_KEY));
 
 /**
  * Sends one email and reports the result (the admin "Send email" button needs it).
- * Brevo if BREVO_API_KEY is set (free 300/day, single verified sender — no
- * domain needed), otherwise Resend (needs a domain).
+ * Providers, first one configured wins:
+ *   1. SMTP — e.g. Gmail with an App Password (SMTP_USER + SMTP_PASS; host defaults to Gmail)
+ *   2. Brevo (BREVO_API_KEY)   3. Resend (RESEND_API_KEY, needs a domain)
  */
 export async function sendEmail(to: string, subject: string, html: string, attachments: Attachment[] = []):
   Promise<{ ok: true } | { ok: false; error: string }> {
-  const from = process.env.EMAIL_FROM;
-  if (!from || !emailConfigured()) return { ok: false, error: "Email is not set up (EMAIL_FROM + BREVO_API_KEY or RESEND_API_KEY)." };
+  const from = fromAddress();
+  if (!from || !emailConfigured()) return { ok: false, error: "Email is not set up — add SMTP_USER + SMTP_PASS (Gmail app password) in Vercel." };
   if (!to) return { ok: false, error: "No recipient." };
   try {
+    if (smtpConfigured()) {
+      const port = Number(process.env.SMTP_PORT || 465);
+      const transport = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || "smtp.gmail.com",
+        port,
+        secure: port === 465,
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS!.replace(/\s+/g, "") }, // Google shows app passwords with spaces
+      });
+      await transport.sendMail({ from, to, subject, html, attachments: attachments.map((a) => ({ filename: a.filename, content: a.content })) });
+      return { ok: true };
+    }
     let r: Response;
     if (process.env.BREVO_API_KEY) {
       r = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -80,7 +98,10 @@ export async function sendEmail(to: string, subject: string, html: string, attac
     return { ok: true };
   } catch (e) {
     console.error("email", e);
-    return { ok: false, error: (e as Error).message };
+    const err = e as Error & { code?: string };
+    if (err.code === "EAUTH")
+      return { ok: false, error: "Gmail rejected the login. Use a 16-letter App Password (not your normal password) in SMTP_PASS, and SMTP_USER must be that Gmail address." };
+    return { ok: false, error: err.message };
   }
 }
 

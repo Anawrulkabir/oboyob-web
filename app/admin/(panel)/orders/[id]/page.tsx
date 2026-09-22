@@ -101,7 +101,7 @@ export default async function OrderDetail({ params, searchParams }: Props) {
           {o.emailed_at && <p className="text-sm text-leaf">✉ শেষ পাঠানো: {dateFmt.format(new Date(o.emailed_at))}</p>}
         </div>
         {!emailConfigured() ? (
-          <p className="mt-3 text-sm text-sindoor">ইমেইল চালু নেই — Vercel-এ EMAIL_FROM এবং BREVO_API_KEY (বা RESEND_API_KEY) সেট করুন।</p>
+          <p className="mt-3 text-sm text-sindoor">ইমেইল চালু নেই — Vercel-এ SMTP_USER (আপনার Gmail) ও SMTP_PASS (Gmail App Password) সেট করুন। README-তে ধাপগুলো আছে।</p>
         ) : (
           <EmailComposer orderId={o.id} to={o.customer_email ?? ""} defaults={defaults} open={compose === "1"} />
         )}

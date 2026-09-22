@@ -63,8 +63,8 @@ What it does:
 - Orders: list, filter by status, open an order, update status, tap-to-call,
   download the slip. Setting an order to "confirmed" opens an email composer
   (English, fully editable) with the payment slip PDF attached → "Send email",
-  sent from EMAIL_FROM. Shipped / delivered / cancelled updates go out by
-  themselves.
+  sent from your Gmail (SMTP) or EMAIL_FROM. Shipped / delivered / cancelled
+  updates go out by themselves.
 - The public site updates immediately after every save.
 
 Security: middleware checks login; every admin page and server action also
@@ -127,8 +127,15 @@ Mobile number (SMS OTP — costs money per SMS, no free option for Bangladesh):
 All optional; never block an order (sent after the response).
 - Seller, Telegram (free): message @BotFather → /newbot → token. Send your bot
   any message, open https://api.telegram.org/bot<TOKEN>/getUpdates, copy chat.id.
-- Email, no domain: Brevo (free 300/day) → verify your sender email → API key →
-  BREVO_API_KEY + EMAIL_FROM="অবয়ব <that-email>".
+- Email, no domain — Gmail (free, ~500/day):
+  1. Google Account → Security → turn on 2-Step Verification.
+  2. Google Account → search "App passwords" → create one (name it "Oboyob") →
+     copy the 16-letter password.
+  3. Vercel env: SMTP_USER=yourname@gmail.com, SMTP_PASS=<that password>.
+     Leave EMAIL_FROM empty (mail goes out as "Oboyob <yourname@gmail.com>").
+  4. Redeploy. Any other SMTP server works too: also set SMTP_HOST/SMTP_PORT.
+- Email, no domain (alternative): Brevo (free 300/day) → verify your sender
+  email → API key → BREVO_API_KEY + EMAIL_FROM="অবয়ব <that-email>".
 - Email, own domain: Resend (free 3,000/mo) → verify domain → RESEND_API_KEY.
 - Customer SMS: any BD gateway with an HTTP API → set SMS_API_URL template.
 
