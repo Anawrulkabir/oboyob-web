@@ -104,6 +104,15 @@ export async function saveProduct(id: string | null, _prev: ProductFormState, fo
   // product_code is assigned by the database trigger (next OB-X-NNN for the category).
   const { data, error } = await sb.from("products").insert({ ...row, category }).select("id").single();
   if (error || !data) return dbError(error);
+
+  // Photos picked on the create form were already uploaded to Storage by the browser.
+  const images = parseImageUrls(form.get("images"));
+  if (images.length) {
+    const { error: imgErr } = await sb.from("product_images").insert(
+      images.map((image_url, i) => ({ product_id: data.id, image_url, alt_text: name, sort_order: i })),
+    );
+    if (imgErr) console.error("product images", imgErr);
+  }
   refreshSite();
   redirect(`/admin/products/${data.id}?created=1`);
 }
@@ -150,6 +159,22 @@ const BUCKET_MARKER = "/storage/v1/object/public/products/";
 function storagePath(url: string): string | null {
   const i = url.indexOf(BUCKET_MARKER);
   return i === -1 ? null : decodeURIComponent(url.slice(i + BUCKET_MARKER.length));
+}
+
+function parseImageUrls(raw: FormDataEntryValue | null): string[] {
+  try {
+    const list: unknown = JSON.parse(String(raw ?? "[]"));
+    return Array.isArray(list) ? list.filter((u): u is string => typeof u === "string" && u.includes(BUCKET_MARKER)).slice(0, 20) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Removes a photo that was uploaded on the create form but taken off before saving. */
+export async function discardUpload(imageUrl: string) {
+  const { sb } = await requireAdmin();
+  const path = storagePath(imageUrl);
+  if (path?.startsWith("drafts/")) await sb.storage.from("products").remove([path]);
 }
 
 /** Registers an image the browser has already uploaded to Storage. */

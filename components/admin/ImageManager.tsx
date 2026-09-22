@@ -4,28 +4,10 @@ import { useRef, useState, useTransition } from "react";
 import SubmitButton from "@/components/SubmitButton";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { createBrowserSupabase } from "@/lib/supabase/browser";
+import { uploadProductImage } from "./upload";
 import { addImage, deleteImage, moveImage, updateAltText } from "@/app/admin/actions";
 import type { ProductImage } from "@/types/product";
 import { adminInput, btnQuiet } from "./styles";
-
-const MAX_BYTES = 15 * 1024 * 1024;
-
-/** Downscale large phone photos in the browser before upload (max 2000px, JPEG). */
-async function prepare(file: File): Promise<Blob> {
-  try {
-    const bmp = await createImageBitmap(file);
-    const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
-    if (scale === 1 && file.size < 1.5 * 1024 * 1024) return file;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bmp.width * scale);
-    canvas.height = Math.round(bmp.height * scale);
-    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-    return await new Promise((res) => canvas.toBlob((b) => res(b ?? file), "image/jpeg", 0.86));
-  } catch {
-    return file;
-  }
-}
 
 export default function ImageManager({ productId, productName, images }: {
   productId: string; productName: string; images: ProductImage[];
@@ -38,24 +20,13 @@ export default function ImageManager({ productId, productName, images }: {
 
   async function upload(files: FileList) {
     setError(null);
-    const sb = createBrowserSupabase();
     const list = Array.from(files);
     for (const [i, file] of list.entries()) {
-      if (!file.type.startsWith("image/")) { setError(`${file.name}: ছবি নয়।`); continue; }
-      if (file.size > MAX_BYTES) { setError(`${file.name}: ১৫MB-এর বেশি।`); continue; }
       setStatus(`আপলোড হচ্ছে ${i + 1}/${list.length}…`);
-      const blob = await prepare(file);
-      const ext = blob.type === "image/jpeg" ? "jpg" : (file.name.split(".").pop() ?? "jpg").toLowerCase();
-      const path = `${productId}/${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await sb.storage.from("products").upload(path, blob, {
-        cacheControl: "31536000", contentType: blob.type || file.type, upsert: false,
-      });
-      if (upErr) { setError(`আপলোড ব্যর্থ: ${upErr.message}`); continue; }
-      const { data } = sb.storage.from("products").getPublicUrl(path);
       try {
-        await addImage(productId, data.publicUrl, productName);
+        await addImage(productId, await uploadProductImage(file, productId), productName);
       } catch (err) {
-        setError(`সংরক্ষণ ব্যর্থ: ${(err as Error).message}`);
+        setError((err as Error).message);
       }
     }
     setStatus(null);

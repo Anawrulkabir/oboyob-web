@@ -34,7 +34,7 @@ export default async function EditProduct({ params, searchParams }: Props) {
             <Link href={`/product/${product.slug}`} target="_blank" className={btnQuiet}>সাইটে দেখুন</Link>
           )}
         </div>
-        {created && <p className="mt-3 text-leaf">পণ্য তৈরি হয়েছে — কোড {product.product_code}। এখন ছবি যোগ করুন।</p>}
+        {created && <p className="mt-3 text-leaf">পণ্য তৈরি হয়েছে — কোড {product.product_code}।{product.images.length === 0 && " এখন ছবি যোগ করুন।"}</p>}
         {product.archived && <p className="mt-3 text-sindoor">এই পণ্যটি আর্কাইভ করা — সাইটে দেখা যায় না।</p>}
       </div>
 
