@@ -13,14 +13,27 @@ and the order form tells customers to message on Facebook.
 
 ## Supabase
 1. SQL editor → run, in order: migrations/0001_init.sql, 0002_admin.sql,
-   0003_customers.sql, 0004_stock.sql, 0005_coupons.sql, then seed.sql.
+   0003_customers.sql, 0004_stock.sql, 0005_coupons.sql, 0006_cart_checkout.sql,
+   then seed.sql.
    Already live? Run only the migrations you haven't run yet, in order.
 2. Set the price (seeded as NULL — not provided):
    update products set price = <TAKA> where product_code = 'OB-C-001';
 3. Photos: public Storage bucket "products" → upload → insert into product_images
    (example at the bottom of seed.sql).
-4. Orders land in the `orders` table. Inserted server-side with the service-role key;
-   RLS blocks all public access to orders.
+4. Orders land in `orders` + `order_items`, placed server-side with the
+   service-role key through place_cart_order(); RLS blocks public access.
+
+## Ordering (customers)
+Cart (saved in the browser) → /checkout: delivery details, delivery area
+(inside Dhaka ৳80 / outside Dhaka ৳110), cash on delivery only, coupon, total
+→ "Confirm" → payment slip page (/order/<id>?t=<token>) with a PDF download.
+- Products need a price to be added to the cart; without one the page says
+  "message us for the price".
+- Delivery charges: delivery_fee() in 0006_cart_checkout.sql decides the
+  total; lib/delivery.ts shows them. Change both together.
+- The slip and customer emails are in English. The PDF is drawn by
+  lib/slip-pdf.ts (pdfkit + HarfBuzz for Bangla names/addresses, fonts in
+  assets/fonts — Noto Sans Bengali, SIL Open Font License).
 
 ## Admin dashboard (/admin)
 Setup (once):
@@ -47,7 +60,11 @@ What it does:
 - Product URLs are made from the product code (OB-S-002 → /product/ob-s-002).
 - Images: multi-upload straight to Supabase Storage (phone photos are resized
   in the browser), reorder, set main image, alt text, delete.
-- Orders: list, filter by status, update status, tap-to-call.
+- Orders: list, filter by status, open an order, update status, tap-to-call,
+  download the slip. Setting an order to "confirmed" opens an email composer
+  (English, fully editable) with the payment slip PDF attached → "Send email",
+  sent from EMAIL_FROM. Shipped / delivered / cancelled updates go out by
+  themselves.
 - The public site updates immediately after every save.
 
 Security: middleware checks login; every admin page and server action also

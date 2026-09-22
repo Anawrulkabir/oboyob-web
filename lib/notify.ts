@@ -1,32 +1,19 @@
 /**
  * Notifications. Every channel is optional and switched on by env vars.
- * Nothing here ever throws — a failed notification must never fail an order.
+ * Automatic notifications never throw — a failed notification must never fail an order.
  *
- *   Seller:   Telegram (free, instant push)  +  email via Resend (free tier)
- *   Customer: email via Resend (free tier)   +  SMS via any HTTP gateway (paid, optional)
+ *   Seller:   Telegram (free, instant push)  +  email
+ *   Customer: email (English, like the payment slip)  +  SMS via any HTTP gateway (optional)
  */
 import { site } from "@/lib/site";
-import { formatPrice } from "@/lib/format";
-import { ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/order-status";
+import type { OrderStatus } from "@/lib/order-status";
+import { deliveryZone } from "@/lib/delivery";
+import { orderRef, type Order } from "@/lib/orders";
 
-export interface OrderInfo {
-  id: string;
-  product_code: string;
-  product_name: string;
-  unit_price: number | null;
-  quantity: number;
-  customer_name: string;
-  customer_phone: string;
-  customer_address: string;
-  customer_email: string | null;
-  note: string | null;
-  coupon_code?: string | null;
-  discount?: number;
-}
-
-const ref = (id: string) => id.slice(0, 8).toUpperCase();
-const total = (o: OrderInfo) => (o.unit_price != null ? formatPrice(o.unit_price * o.quantity - (o.discount ?? 0)) : null);
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+const tk = (n: number | null | undefined) => `Tk ${(n ?? 0).toLocaleString("en-IN")}`;
+const itemsLine = (o: Order) => o.items.map((i) => `${i.product_name} × ${i.quantity}`).join(", ");
+export const slipUrl = (o: Pick<Order, "id" | "slip_token">) => `${site.url}/order/${o.id}?t=${o.slip_token}`;
 
 // ---------------------------------------------------------------- channels
 
@@ -50,30 +37,55 @@ function parseFrom(from: string) {
   return m ? { name: m[1].trim(), email: m[2].trim() } : { email: from.trim() };
 }
 
+export interface Attachment { filename: string; content: Buffer }
+
+export const emailConfigured = () => !!process.env.EMAIL_FROM && !!(process.env.BREVO_API_KEY || process.env.RESEND_API_KEY);
+
 /**
- * Email: Brevo if BREVO_API_KEY is set (free 300/day, works with a single
- * verified sender address — no domain needed), otherwise Resend (needs a domain).
+ * Sends one email and reports the result (the admin "Send email" button needs it).
+ * Brevo if BREVO_API_KEY is set (free 300/day, single verified sender — no
+ * domain needed), otherwise Resend (needs a domain).
  */
-async function email(to: string, subject: string, html: string) {
+export async function sendEmail(to: string, subject: string, html: string, attachments: Attachment[] = []):
+  Promise<{ ok: true } | { ok: false; error: string }> {
   const from = process.env.EMAIL_FROM;
-  if (!from || !to) return;
+  if (!from || !emailConfigured()) return { ok: false, error: "Email is not set up (EMAIL_FROM + BREVO_API_KEY or RESEND_API_KEY)." };
+  if (!to) return { ok: false, error: "No recipient." };
   try {
     let r: Response;
     if (process.env.BREVO_API_KEY) {
       r = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: { "api-key": process.env.BREVO_API_KEY, "Content-Type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ sender: parseFrom(from), to: [{ email: to }], subject, htmlContent: html }),
+        body: JSON.stringify({
+          sender: parseFrom(from), to: [{ email: to }], subject, htmlContent: html,
+          ...(attachments.length && { attachment: attachments.map((a) => ({ name: a.filename, content: a.content.toString("base64") })) }),
+        }),
       });
-    } else if (process.env.RESEND_API_KEY) {
+    } else {
       r = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, subject, html }),
+        body: JSON.stringify({
+          from, to, subject, html,
+          ...(attachments.length && { attachments: attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }),
+        }),
       });
-    } else return;
-    if (!r.ok) console.error("email", r.status, await r.text());
-  } catch (e) { console.error("email", e); }
+    }
+    if (!r.ok) {
+      const body = await r.text();
+      console.error("email", r.status, body);
+      return { ok: false, error: `Email provider said ${r.status}: ${body.slice(0, 200)}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("email", e);
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+async function email(to: string, subject: string, html: string) {
+  if (emailConfigured()) await sendEmail(to, subject, html);
 }
 
 /**
@@ -94,68 +106,85 @@ async function sms(localPhone: string, text: string) {
   try { await sendSmsStrict(localPhone, text); } catch (e) { console.error("sms", e); }
 }
 
-function layout(body: string) {
-  return `<div style="font-family:'Hind Siliguri',Arial,sans-serif;max-width:520px;margin:0 auto;color:#231f1b;background:#fbf8f2;padding:28px;line-height:1.7">
-  <p style="font-size:22px;margin:0 0 18px">${site.nameBn} <span style="color:#6b6157;font-size:14px">${site.nameEn}</span></p>
-  ${body}
-  <p style="margin-top:28px;font-size:13px;color:#6b6157">প্রশ্ন থাকলে Facebook পেজে মেসেজ করুন: <a href="${site.facebook}" style="color:#a8742a">${site.facebook}</a></p>
+// ------------------------------------------------------------ email layout
+
+/** Wraps a message in the shop's email frame (English). `message` is plain text; blank lines = paragraphs. */
+export function emailHtml(message: string, o?: Order, extra = "") {
+  const paras = esc(message).split(/\n\s*\n/).map((p) => `<p style="margin:0 0 14px">${p.replace(/\n/g, "<br>")}</p>`).join("");
+  return `<div style="background:#f3ece0;padding:24px 12px">
+  <div style="font-family:Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;color:#231f1b;background:#fbf8f2;padding:32px 28px;line-height:1.6;font-size:15px;border-top:4px solid #a8742a">
+    <p style="font-size:22px;margin:0 0 4px;letter-spacing:0.5px">${esc(site.nameEn.toUpperCase())}</p>
+    <p style="margin:0 0 24px;color:#6b6157;font-size:13px">${esc(site.tagline)}</p>
+    ${paras}
+    ${o ? orderTable(o) : ""}
+    ${extra}
+    <p style="margin-top:28px;font-size:12px;color:#6b6157;border-top:1px solid #e3d9c8;padding-top:14px">
+      Questions? Message us on Facebook: <a href="${site.facebook}" style="color:#a8742a">${site.facebook}</a>
+    </p>
+  </div>
 </div>`;
 }
 
-function orderTable(o: OrderInfo) {
-  const row = (k: string, v: string) =>
-    `<tr><td style="padding:6px 12px 6px 0;color:#6b6157;vertical-align:top">${k}</td><td style="padding:6px 0">${v}</td></tr>`;
-  return `<table style="border-top:1px solid #e3d9c8;border-bottom:1px solid #e3d9c8;width:100%;font-size:15px">
-    ${row("পণ্য", `${esc(o.product_name)} (${o.product_code})`)}
-    ${row("পরিমাণ", String(o.quantity))}
-    ${o.coupon_code ? row("কুপন", `${esc(o.coupon_code)} (−${formatPrice(o.discount ?? 0)})`) : ""}
-    ${total(o) ? row("মোট", total(o)!) : ""}
-    ${row("নাম", esc(o.customer_name))}
-    ${row("ফোন", o.customer_phone)}
-    ${row("ঠিকানা", esc(o.customer_address).replace(/\n/g, "<br>"))}
-    ${o.note ? row("নোট", esc(o.note)) : ""}
-  </table>`;
+function orderTable(o: Order) {
+  const cell = "padding:8px 0;border-bottom:1px solid #e3d9c8";
+  const rows = o.items.map((i) => `<tr><td style="${cell}">${esc(i.product_name)}<br><span style="color:#6b6157;font-size:12px">${esc(i.product_code)} · ${tk(i.unit_price)} × ${i.quantity}</span></td><td style="${cell};text-align:right;white-space:nowrap">${tk(i.unit_price * i.quantity)}</td></tr>`).join("");
+  const line = (k: string, v: string, bold = false) =>
+    `<tr><td style="padding:4px 0;color:${bold ? "#231f1b" : "#6b6157"}${bold ? ";font-weight:bold" : ""}">${k}</td><td style="padding:4px 0;text-align:right${bold ? ";font-weight:bold;font-size:17px" : ""}">${v}</td></tr>`;
+  const zone = deliveryZone(o.delivery_zone);
+  return `<p style="margin:22px 0 6px;font-size:13px;color:#6b6157">ORDER #${orderRef(o.id)}</p>
+  <table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table>
+  <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:8px">
+    ${line("Subtotal", tk(o.subtotal))}
+    ${o.discount ? line(`Coupon (${esc(o.coupon_code ?? "")})`, `− ${tk(o.discount)}`) : ""}
+    ${line(`Delivery${zone ? ` (${zone.labelEn})` : ""}`, tk(o.delivery_charge))}
+    ${line("Total — Cash on Delivery", tk(o.total), true)}
+  </table>
+  <p style="margin:16px 0 0;font-size:13px;color:#6b6157">Deliver to: ${esc(o.customer_name)}, ${esc(o.customer_phone)}<br>${esc(o.customer_address).replace(/\n/g, "<br>")}</p>`;
 }
 
 // ------------------------------------------------------------------ events
 
-export async function notifyNewOrder(o: OrderInfo) {
-  const admin = `${site.url}/admin/orders`;
+export async function notifyNewOrder(o: Order) {
+  const admin = `${site.url}/admin/orders/${o.id}`;
   await Promise.all([
     telegram(
-      `🛍 <b>নতুন অর্ডার</b> #${ref(o.id)}\n` +
-      `${esc(o.product_name)} (${o.product_code}) × ${o.quantity}${total(o) ? ` = ${total(o)}` : ""}\n` +
-      (o.coupon_code ? `🏷 কুপন ${esc(o.coupon_code)} (−${formatPrice(o.discount ?? 0)})\n` : "") + `\n` +
+      `🛍 <b>নতুন অর্ডার</b> #${orderRef(o.id)} — ${tk(o.total)} (COD)\n` +
+      o.items.map((i) => `• ${esc(i.product_name)} (${i.product_code}) × ${i.quantity}`).join("\n") + "\n" +
+      (o.coupon_code ? `🏷 ${esc(o.coupon_code)} (−${tk(o.discount)})\n` : "") +
+      `🚚 ${deliveryZone(o.delivery_zone)?.label ?? ""} ${tk(o.delivery_charge)}\n\n` +
       `👤 ${esc(o.customer_name)}\n📞 ${o.customer_phone}\n📍 ${esc(o.customer_address)}` +
       (o.note ? `\n📝 ${esc(o.note)}` : "") + `\n\n${admin}`,
     ),
     process.env.SELLER_EMAIL &&
-      email(process.env.SELLER_EMAIL, `নতুন অর্ডার #${ref(o.id)} — ${o.product_name}`,
-        layout(`<p>নতুন অর্ডার এসেছে।</p>${orderTable(o)}<p><a href="${admin}" style="color:#a8742a">অ্যাডমিনে দেখুন</a></p>`)),
+      email(process.env.SELLER_EMAIL, `New order #${orderRef(o.id)} — ${tk(o.total)}`,
+        emailHtml(`A new order has arrived.${o.note ? `\n\nCustomer note: ${o.note}` : ""}`, o,
+          `<p style="margin-top:18px"><a href="${admin}" style="color:#a8742a">Open in admin</a></p>`)),
     o.customer_email &&
-      email(o.customer_email, `আপনার অর্ডার পেয়েছি — #${ref(o.id)}`,
-        layout(`<p>প্রিয় ${esc(o.customer_name)},</p>
-          <p>অবয়ব-এ অর্ডারের জন্য ধন্যবাদ। কনফার্ম করতে শীঘ্রই আপনাকে ফোন করা হবে।</p>
-          ${orderTable(o)}<p style="font-size:13px;color:#6b6157">অর্ডার রেফারেন্স: #${ref(o.id)}</p>`)),
-    sms(o.customer_phone, `অবয়ব: আপনার অর্ডার #${ref(o.id)} (${o.product_name}) পেয়েছি। কনফার্ম করতে শীঘ্রই ফোন করা হবে।`),
+      email(o.customer_email, `We've received your order #${orderRef(o.id)}`,
+        emailHtml(`Dear ${o.customer_name},\n\nThank you for shopping with ${site.nameEn}. We have received your order and will call you shortly to confirm it. Payment is cash on delivery.`, o,
+          `<p style="margin-top:18px"><a href="${slipUrl(o)}" style="display:inline-block;background:#231f1b;color:#fbf8f2;padding:10px 18px;text-decoration:none">View payment slip</a></p>`)),
+    sms(o.customer_phone, `${site.nameEn}: order #${orderRef(o.id)} received (${itemsLine(o)}). Total ${tk(o.total)}, cash on delivery. We'll call to confirm.`),
   ]);
 }
 
 const STATUS_MESSAGE: Partial<Record<OrderStatus, string>> = {
-  confirmed: "আপনার অর্ডার কনফার্ম হয়েছে। শীঘ্রই পাঠানো হবে।",
-  shipped: "আপনার অর্ডার পাঠানো হয়েছে। শীঘ্রই হাতে পাবেন।",
-  delivered: "আপনার অর্ডার ডেলিভারি হয়েছে। অবয়ব-এর সাথে থাকার জন্য ধন্যবাদ।",
-  cancelled: "আপনার অর্ডার বাতিল করা হয়েছে। কোনো প্রশ্ন থাকলে আমাদের মেসেজ করুন।",
+  shipped: "Good news — your order is on its way. You'll receive it soon.",
+  delivered: "Your order has been delivered. Thank you for shopping with us!",
+  cancelled: "Your order has been cancelled. If you have any questions, please message us.",
 };
 
-export async function notifyStatusChange(o: OrderInfo, status: OrderStatus) {
+/**
+ * Automatic updates when the admin changes an order's status. "Confirmed" is
+ * not sent here — the admin sends that one by hand, with the slip attached.
+ */
+export async function notifyStatusChange(o: Order, status: OrderStatus) {
   const msg = STATUS_MESSAGE[status];
   if (!msg) return;
   await Promise.all([
     o.customer_email &&
-      email(o.customer_email, `অর্ডার #${ref(o.id)}: ${ORDER_STATUS_LABEL[status]}`,
-        layout(`<p>প্রিয় ${esc(o.customer_name)},</p><p>${msg}</p>${orderTable(o)}
-          <p><a href="${site.url}/account" style="color:#a8742a">আপনার অর্ডারগুলো দেখুন</a></p>`)),
-    sms(o.customer_phone, `অবয়ব: অর্ডার #${ref(o.id)} — ${msg}`),
+      email(o.customer_email, `Order #${orderRef(o.id)}: ${status === "shipped" ? "shipped" : status}`,
+        emailHtml(`Dear ${o.customer_name},\n\n${msg}`, o)),
+    sms(o.customer_phone, `${site.nameEn}: order #${orderRef(o.id)} — ${msg}`),
   ]);
 }
+

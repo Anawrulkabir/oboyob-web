@@ -30,7 +30,7 @@ export default async function AccountPage() {
   const [{ data: profile }, { data: orders }] = await Promise.all([
     sb.from("profiles").select("full_name, phone, email, address").eq("id", user.id).maybeSingle(),
     sb.from("orders")
-      .select("id, product_name, product_code, quantity, unit_price, discount, status, created_at, product:products(slug)")
+      .select("id, status, created_at, total, slip_token, items:order_items(id, product_name, quantity, product:products(slug))")
       .eq("customer_id", user.id).order("created_at", { ascending: false }).limit(50),
   ]);
 
@@ -55,20 +55,24 @@ export default async function AccountPage() {
             {orders.map((o) => {
               const status = (ORDER_STATUSES as readonly string[]).includes(o.status) ? (o.status as OrderStatus) : "new";
               const step = STEPS.indexOf(status);
-              const slug = (o.product as unknown as { slug: string } | null)?.slug;
+              const items = (o.items ?? []) as unknown as { id: string; product_name: string; quantity: number; product: { slug: string } | null }[];
               return (
                 <li key={o.id} className="py-5">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <p>
-                      {slug ? <Link href={`/product/${slug}`} className="hover:text-haldi">{o.product_name}</Link> : o.product_name}
-                      <span className="text-ink-soft"> × {o.quantity}</span>
-                    </p>
-                    <p className="text-sm text-ink-soft">
-                      {o.unit_price != null && <>{formatPrice(o.unit_price * o.quantity - (o.discount ?? 0))} / </>}
-                      {dateFmt.format(new Date(o.created_at))}
-                    </p>
+                    <p className="text-sm text-ink-soft">#{o.id.slice(0, 8).toUpperCase()} / {dateFmt.format(new Date(o.created_at))}</p>
+                    <p className="tabular-nums">{formatPrice(o.total)}</p>
                   </div>
-                  <p className="text-xs text-ink-soft">#{o.id.slice(0, 8).toUpperCase()} / {o.product_code}</p>
+                  <ul className="mt-1">
+                    {items.map((i) => (
+                      <li key={i.id}>
+                        {i.product ? <Link href={`/product/${i.product.slug}`} className="hover:text-haldi">{i.product_name}</Link> : i.product_name}
+                        <span className="text-ink-soft"> × {i.quantity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href={`/order/${o.id}?t=${o.slip_token}`} className="mt-1 inline-block text-sm text-ink-soft underline underline-offset-4 hover:text-ink">
+                    পেমেন্ট স্লিপ দেখুন
+                  </Link>
                   {status === "cancelled" ? (
                     <p className="mt-3 text-sm text-sindoor">বাতিল</p>
                   ) : (

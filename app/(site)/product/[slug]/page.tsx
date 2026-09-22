@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import ProductGallery from "@/components/ProductGallery";
 import ProductInfo from "@/components/ProductInfo";
 import ProductSpecifications from "@/components/ProductSpecifications";
-import OrderForm from "@/components/OrderForm";
+import AddToCart from "@/components/AddToCart";
 import StickyOrderBar from "@/components/StickyOrderBar";
 import { formatPrice, PRICE_ON_REQUEST } from "@/lib/format";
 import { getProductBySlug, getProducts } from "@/lib/products";
@@ -70,21 +70,12 @@ export default async function ProductPage({ params }: Props) {
         </div>
 
         <div className="space-y-12">
-          <ProductInfo product={product} />
+          <ProductInfo product={product} cta={<AddToCart product={product} />} />
           <ProductSpecifications specs={product.specifications} />
 
-          {/* Always mounted: ordering the last piece re-renders this page as sold out,
-              and the form must keep showing the customer's confirmation. */}
-          <section id="order" aria-labelledby="order-title" className="scroll-mt-24 border-t border-ink/80 pt-6">
-            <h2 id="order-title" className="text-2xl">অর্ডার করুন</h2>
-            <p className="mt-1 mb-6 text-sm text-ink-soft">
-              {product.available ? "তথ্য দিন, আমরা ফোন করে কনফার্ম করব।" : "এই পণ্যটি আবার স্টকে এলে অর্ডার করা যাবে।"}
-            </p>
-            <OrderForm slug={product.slug} productName={product.name} productCode={product.product_code} price={product.price} stock={product.stock} />
-          </section>
         </div>
       </div>
-      {product.available && <StickyOrderBar name={product.name} price={formatPrice(product.price) ?? PRICE_ON_REQUEST} />}
+      {product.available && product.price != null && <StickyOrderBar name={product.name} price={formatPrice(product.price) ?? PRICE_ON_REQUEST} />}
     </article>
   );
 }

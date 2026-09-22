@@ -2,7 +2,9 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
-import { notifyStatusChange, type OrderInfo } from "@/lib/notify";
+import { emailHtml, notifyStatusChange, sendEmail, slipUrl } from "@/lib/notify";
+import { loadOrder, orderRef } from "@/lib/orders";
+import { renderSlipPdf } from "@/lib/slip-pdf";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { createSessionClient } from "@/lib/supabase/session";
@@ -216,19 +218,54 @@ export async function updateAltText(imageId: string, form: FormData) {
 }
 
 // ----------------------------------------------------------------- orders
-export async function setOrderStatus(orderId: string, form: FormData) {
+/** `back` = where to return: the orders list or the order's own page. */
+export async function setOrderStatus(orderId: string, back: "list" | "detail", form: FormData) {
   const { sb } = await requireAdmin();
   const status = String(form.get("status"));
   if (!(ORDER_STATUSES as readonly string[]).includes(status)) return;
+  const here = back === "detail" ? `/admin/orders/${orderId}` : "/admin/orders";
   const { data: before } = await sb.from("orders").select("status").eq("id", orderId).single();
-  // Cancelling puts the pieces back in stock (orders_restock trigger, 0004_stock.sql).
-  const { data: order, error } = await sb.from("orders").update({ status }).eq("id", orderId).select("*").single();
-  if (error?.message.includes("OUT_OF_STOCK")) redirect("/admin/orders?error=restock");
-  if (error || !order) throw new Error(error?.message ?? "update failed");
-  revalidatePath("/admin/orders");
-  if (before?.status !== status && (status === "cancelled" || before?.status === "cancelled")) refreshSite();
-  // Tell the customer (email/SMS if configured) — only when the status actually changed.
-  if (before?.status !== status) after(() => notifyStatusChange(order as OrderInfo, status as OrderStatus));
+  // Cancelling puts the pieces back in stock (orders_restock trigger).
+  const { error } = await sb.from("orders").update({ status }).eq("id", orderId);
+  if (error?.message.includes("OUT_OF_STOCK")) redirect(`${here}?error=restock`);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/orders", "layout");
+  const changed = before?.status !== status;
+  if (changed && (status === "cancelled" || before?.status === "cancelled")) refreshSite();
+  if (changed) {
+    const order = await loadOrder(sb, orderId);
+    // Shipped / delivered / cancelled go out automatically (email + SMS if set up).
+    if (order) after(() => notifyStatusChange(order, status as OrderStatus));
+  }
+  // Confirming opens the order with the email composer, slip attached.
+  if (changed && status === "confirmed") redirect(`/admin/orders/${orderId}?compose=1`);
+}
+
+export interface EmailState { status: "idle" | "sent" | "error"; message?: string }
+
+/** The "Send email" button: the admin's own message, with the payment slip PDF attached. */
+export async function sendOrderEmail(orderId: string, _prev: EmailState, form: FormData): Promise<EmailState> {
+  const { sb } = await requireAdmin();
+  const order = await loadOrder(sb, orderId);
+  if (!order) return { status: "error", message: "Order not found." };
+  const to = String(form.get("to") ?? "").trim();
+  const subject = String(form.get("subject") ?? "").trim();
+  const message = String(form.get("message") ?? "").trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(to)) return { status: "error", message: "Enter a valid email address." };
+  if (!subject || !message) return { status: "error", message: "Subject and message can't be empty." };
+
+  const attach = form.get("attach") === "on";
+  const attachments = attach
+    ? [{ filename: `oboyob-slip-${orderRef(order.id)}.pdf`, content: await renderSlipPdf(order) }]
+    : [];
+  const html = emailHtml(message, order,
+    `<p style="margin-top:18px"><a href="${slipUrl(order)}" style="display:inline-block;background:#231f1b;color:#fbf8f2;padding:10px 18px;text-decoration:none">View payment slip online</a></p>`);
+  const r = await sendEmail(to, subject, html, attachments);
+  if (!r.ok) return { status: "error", message: r.error };
+
+  await sb.from("orders").update({ emailed_at: new Date().toISOString() }).eq("id", orderId);
+  revalidatePath(`/admin/orders/${orderId}`);
+  return { status: "sent", message: `Sent to ${to}${attach ? " with the payment slip attached" : ""}.` };
 }
 
 // ---------------------------------------------------------------- coupons

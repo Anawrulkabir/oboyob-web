@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CATEGORIES } from "@/lib/categories";
 import { site } from "@/lib/site";
 import MenuDrawer from "./MenuDrawer";
+import CartDrawer from "./CartDrawer";
 
 export default function Navbar() {
   return (
@@ -25,13 +26,14 @@ export default function Navbar() {
           <span className="font-display text-2xl leading-none">{site.nameBn}</span>
         </Link>
 
-        <div className="flex items-center justify-end gap-4 text-[15px]">
+        <div className="flex items-center justify-end gap-1 text-[15px] sm:gap-3">
           <a href={site.facebook} target="_blank" rel="noopener noreferrer" className="hidden text-ink-soft hover:text-ink md:inline">
             Facebook
           </a>
-          <Link href="/account" className="-mr-2 flex h-10 w-10 items-center justify-center text-ink hover:text-haldi" aria-label="আমার অ্যাকাউন্ট">
+          <Link href="/account" className="flex h-10 w-10 items-center justify-center text-ink hover:text-haldi" aria-label="আমার অ্যাকাউন্ট">
             <svg aria-hidden viewBox="0 0 24 24" className="h-[22px] w-[22px] fill-none stroke-current" strokeWidth="1.5"><circle cx="12" cy="8" r="4" /><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6" /></svg>
           </Link>
+          <div className="-mr-2"><CartDrawer /></div>
         </div>
       </div>
     </header>

@@ -5,7 +5,8 @@ import { site } from "@/lib/site";
 import Availability from "./Availability";
 import Price from "./Price";
 
-export default function ProductInfo({ product }: { product: Product }) {
+/** `cta` is the buy box (add to cart); the admin preview leaves it out and gets a static stand-in. */
+export default function ProductInfo({ product, cta }: { product: Product; cta?: React.ReactNode }) {
   const category = getCategory(product.category);
   const paragraphs = product.description?.split(/\n\s*\n/).filter(Boolean) ?? [];
 
@@ -27,19 +28,17 @@ export default function ProductInfo({ product }: { product: Product }) {
 
       {paragraphs[0] && <p className="mt-6 text-[17px] leading-relaxed">{paragraphs[0]}</p>}
 
-      <div id="product-cta" className="mt-7 flex flex-col gap-3 sm:flex-row">
-        {product.available ? (
-          <a href="#order" className="bg-ink px-6 py-3 text-center text-paper hover:bg-ink/85">Order Now</a>
-        ) : (
-          <span className="border border-sindoor/50 px-6 py-3 text-center text-sindoor">Sold out — এই মুহূর্তে বিক্রি শেষ</span>
+      <div id="product-cta" className="mt-7 scroll-mt-24">
+        {cta ?? (
+          product.available ? (
+            <span className="block bg-ink px-6 py-3 text-center text-paper">কার্টে যোগ করুন</span>
+          ) : (
+            <span className="block border border-sindoor/50 px-6 py-3 text-center text-sindoor">Sold out — এই মুহূর্তে বিক্রি শেষ</span>
+          )
         )}
-        <a
-          href={site.facebook}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="border border-ink px-6 py-3 text-center hover:bg-ink hover:text-paper"
-        >
-          Message on Facebook
+        <a href={site.facebook} target="_blank" rel="noopener noreferrer"
+          className="mt-3 inline-block text-sm text-ink-soft underline decoration-line underline-offset-4 hover:text-ink">
+          প্রশ্ন আছে? Facebook-এ মেসেজ করুন
         </a>
       </div>
 
@@ -60,7 +59,7 @@ export default function ProductInfo({ product }: { product: Product }) {
 
       <ul className="mt-6 space-y-1 text-sm text-ink-soft">
         <li>🚚 হোম ডেলিভারি: সারা বাংলাদেশ</li>
-        <li>📩 অর্ডার করতে নিচের ফর্ম পূরণ করুন, অথবা ইনবক্সে মেসেজ করুন</li>
+        <li>💵 ক্যাশ অন ডেলিভারি</li>
       </ul>
     </div>
   );

@@ -2,19 +2,15 @@
 
 import { useEffect, useState } from "react";
 
-/** Mobile-only bottom bar with the price and Order button; hides once the form is on screen. */
+/** Mobile-only bottom bar with the price and a jump to the buy box; hidden while the buy box is on screen. */
 export default function StickyOrderBar({ name, price }: { name: string; price: string }) {
   const [show, setShow] = useState(false);
   useEffect(() => {
-    const form = document.getElementById("order");
-    const top = document.getElementById("product-cta");
-    if (!form || !top) return;
-    const seen = { form: false, top: true };
-    const io = new IntersectionObserver((entries) => {
-      for (const en of entries) seen[en.target === form ? "form" : "top"] = en.isIntersecting;
-      setShow(!seen.form && !seen.top);
-    });
-    io.observe(form); io.observe(top);
+    const cta = document.getElementById("product-cta");
+    if (!cta) return;
+    // Show only once the buy box has scrolled off the top, not before reaching it.
+    const io = new IntersectionObserver(([en]) => setShow(!en.isIntersecting && en.boundingClientRect.top < 0));
+    io.observe(cta);
     return () => io.disconnect();
   }, []);
 
@@ -28,7 +24,7 @@ export default function StickyOrderBar({ name, price }: { name: string; price: s
           <p className="truncate font-display">{name}</p>
           <p className="text-sm tabular-nums text-ink-soft">{price}</p>
         </div>
-        <a href="#order" tabIndex={show ? 0 : -1} className="shrink-0 bg-ink px-6 py-3 text-paper">অর্ডার করুন</a>
+        <a href="#product-cta" tabIndex={show ? 0 : -1} className="shrink-0 bg-ink px-6 py-3 text-paper">কার্টে যোগ করুন</a>
       </div>
     </div>
   );
