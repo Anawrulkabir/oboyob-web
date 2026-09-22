@@ -20,10 +20,12 @@ export interface OrderInfo {
   customer_address: string;
   customer_email: string | null;
   note: string | null;
+  coupon_code?: string | null;
+  discount?: number;
 }
 
 const ref = (id: string) => id.slice(0, 8).toUpperCase();
-const total = (o: OrderInfo) => (o.unit_price != null ? formatPrice(o.unit_price * o.quantity) : null);
+const total = (o: OrderInfo) => (o.unit_price != null ? formatPrice(o.unit_price * o.quantity - (o.discount ?? 0)) : null);
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 // ---------------------------------------------------------------- channels
@@ -106,6 +108,7 @@ function orderTable(o: OrderInfo) {
   return `<table style="border-top:1px solid #e3d9c8;border-bottom:1px solid #e3d9c8;width:100%;font-size:15px">
     ${row("পণ্য", `${esc(o.product_name)} (${o.product_code})`)}
     ${row("পরিমাণ", String(o.quantity))}
+    ${o.coupon_code ? row("কুপন", `${esc(o.coupon_code)} (−${formatPrice(o.discount ?? 0)})`) : ""}
     ${total(o) ? row("মোট", total(o)!) : ""}
     ${row("নাম", esc(o.customer_name))}
     ${row("ফোন", o.customer_phone)}
@@ -121,7 +124,8 @@ export async function notifyNewOrder(o: OrderInfo) {
   await Promise.all([
     telegram(
       `🛍 <b>নতুন অর্ডার</b> #${ref(o.id)}\n` +
-      `${esc(o.product_name)} (${o.product_code}) × ${o.quantity}${total(o) ? ` = ${total(o)}` : ""}\n\n` +
+      `${esc(o.product_name)} (${o.product_code}) × ${o.quantity}${total(o) ? ` = ${total(o)}` : ""}\n` +
+      (o.coupon_code ? `🏷 কুপন ${esc(o.coupon_code)} (−${formatPrice(o.discount ?? 0)})\n` : "") + `\n` +
       `👤 ${esc(o.customer_name)}\n📞 ${o.customer_phone}\n📍 ${esc(o.customer_address)}` +
       (o.note ? `\n📝 ${esc(o.note)}` : "") + `\n\n${admin}`,
     ),

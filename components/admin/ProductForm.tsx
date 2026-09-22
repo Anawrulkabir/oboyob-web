@@ -19,7 +19,7 @@ function draftFrom(form: HTMLFormElement | null, base: Product | undefined, phot
   return {
     id: base?.id ?? "draft",
     product_code: base?.product_code ?? "OB-…",
-    slug: get("slug", base?.slug) || "draft",
+    slug: base?.slug ?? "draft",
     name: get("name", base?.name) || "পণ্যের নাম",
     subtitle: get("subtitle", base?.subtitle ?? "") || null,
     category: (base?.category ?? (get("category") || "sharee")) as CategorySlug,
@@ -74,9 +74,6 @@ export default function ProductForm({ product }: { product?: Product }) {
       <div className="grid gap-6 sm:grid-cols-2">
         <Field label="নাম" error={e.name}>
           <input name="name" defaultValue={product?.name} required className={adminInput} aria-invalid={!!e.name} />
-        </Field>
-        <Field label="Slug (URL)" hint="যেমন saptapadi → /product/saptapadi" error={e.slug}>
-          <input name="slug" defaultValue={product?.slug} required pattern="[a-z0-9]+(-[a-z0-9]+)*" className={adminInput} aria-invalid={!!e.slug} />
         </Field>
 
         <Field label="ক্যাটাগরি" hint={product ? "প্রোডাক্ট কোড তৈরির পর ক্যাটাগরি বদলানো যায় না।" : undefined} error={e.category}>

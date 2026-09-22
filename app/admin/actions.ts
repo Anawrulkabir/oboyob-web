@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/admin";
 import { createSessionClient } from "@/lib/supabase/session";
 import { getCategory } from "@/lib/categories";
 import { PRODUCTS_TAG } from "@/lib/products";
+import { COUPON_CODE, normalizeCouponCode } from "@/lib/coupon";
 import { ORDER_STATUSES, type OrderStatus } from "@/lib/order-status";
 import type { ProductSpec } from "@/types/product";
 
@@ -44,10 +45,8 @@ export async function signOut() {
 export interface ProductFormState {
   status: "idle" | "saved" | "error";
   message?: string;
-  errors?: Partial<Record<"name" | "slug" | "category" | "price" | "stock" | "specifications", string>>;
+  errors?: Partial<Record<"name" | "category" | "price" | "stock" | "specifications", string>>;
 }
-
-const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 function parseSpecs(raw: string): ProductSpec[] | null {
   const specs: ProductSpec[] = [];
@@ -64,7 +63,6 @@ export async function saveProduct(id: string | null, _prev: ProductFormState, fo
   const { sb } = await requireAdmin();
 
   const name = String(form.get("name") ?? "").trim();
-  const slug = String(form.get("slug") ?? "").trim().toLowerCase();
   const category = String(form.get("category") ?? "");
   const priceRaw = String(form.get("price") ?? "").trim();
   const stockRaw = String(form.get("stock") ?? "").trim();
@@ -72,7 +70,6 @@ export async function saveProduct(id: string | null, _prev: ProductFormState, fo
 
   const errors: ProductFormState["errors"] = {};
   if (!name) errors.name = "নাম দিন।";
-  if (!SLUG.test(slug)) errors.slug = "শুধু ছোট হাতের ইংরেজি অক্ষর, সংখ্যা ও হাইফেন (যেমন saptapadi)।";
   if (!id && !getCategory(category)) errors.category = "ক্যাটাগরি বাছাই করুন।";
   const price = priceRaw === "" ? null : Number(priceRaw);
   if (price !== null && (!Number.isInteger(price) || price < 0)) errors.price = "পূর্ণ টাকায় লিখুন (যেমন 1250), অথবা খালি রাখুন।";
@@ -84,7 +81,7 @@ export async function saveProduct(id: string | null, _prev: ProductFormState, fo
 
   const row = {
     name,
-    slug,
+    // slug (the /product/… URL) is set by the database from the product code and never changes.
     subtitle: String(form.get("subtitle") ?? "").trim() || null,
     description: String(form.get("description") ?? "").trim() || null,
     features: String(form.get("features") ?? "").split("\n").map((l) => l.trim()).filter(Boolean),
@@ -118,8 +115,6 @@ export async function saveProduct(id: string | null, _prev: ProductFormState, fo
 }
 
 function dbError(error: { code?: string; message?: string } | null): ProductFormState {
-  if (error?.code === "23505" && error.message?.includes("slug"))
-    return { status: "error", errors: { slug: "এই slug আগে থেকেই ব্যবহৃত।" }, message: "Slug পরিবর্তন করুন।" };
   console.error(error);
   return { status: "error", message: `সংরক্ষণ হয়নি: ${error?.message ?? "অজানা ত্রুটি"}` };
 }
@@ -234,4 +229,63 @@ export async function setOrderStatus(orderId: string, form: FormData) {
   if (before?.status !== status && (status === "cancelled" || before?.status === "cancelled")) refreshSite();
   // Tell the customer (email/SMS if configured) — only when the status actually changed.
   if (before?.status !== status) after(() => notifyStatusChange(order as OrderInfo, status as OrderStatus));
+}
+
+// ---------------------------------------------------------------- coupons
+export interface CouponFormState {
+  status: "idle" | "saved" | "error";
+  message?: string;
+  errors?: Partial<Record<"code" | "value" | "min_order" | "max_discount" | "usage_limit" | "expires_at", string>>;
+}
+
+const optionalInt = (raw: FormDataEntryValue | null) => {
+  const s = String(raw ?? "").trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isInteger(n) && n >= 0 ? n : NaN;
+};
+
+export async function createCoupon(_prev: CouponFormState, form: FormData): Promise<CouponFormState> {
+  const { sb } = await requireAdmin();
+  const code = normalizeCouponCode(String(form.get("code") ?? ""));
+  const kind = form.get("kind") === "fixed" ? "fixed" : "percent";
+  const value = optionalInt(form.get("value"));
+  const min_order = optionalInt(form.get("min_order"));
+  const max_discount = kind === "percent" ? optionalInt(form.get("max_discount")) : null;
+  const usage_limit = optionalInt(form.get("usage_limit"));
+  const expiresRaw = String(form.get("expires_at") ?? "").trim(); // yyyy-mm-dd, Dhaka time
+  const expires_at = expiresRaw ? new Date(`${expiresRaw}T23:59:59+06:00`) : null;
+
+  const errors: CouponFormState["errors"] = {};
+  if (!COUPON_CODE.test(code)) errors.code = "৩–৩০ অক্ষর: ইংরেজি অক্ষর, সংখ্যা, - বা _ (যেমন EID10)।";
+  if (value == null || Number.isNaN(value) || value < 1 || (kind === "percent" && value > 100))
+    errors.value = kind === "percent" ? "১ থেকে ১০০ এর মধ্যে % দিন।" : "কত টাকা ছাড় লিখুন।";
+  if (Number.isNaN(min_order)) errors.min_order = "পূর্ণ টাকায় লিখুন, অথবা খালি রাখুন।";
+  if (Number.isNaN(max_discount) || max_discount === 0) errors.max_discount = "পূর্ণ টাকায় লিখুন, অথবা খালি রাখুন।";
+  if (Number.isNaN(usage_limit) || usage_limit === 0) errors.usage_limit = "কতবার ব্যবহার করা যাবে লিখুন, অথবা খালি রাখুন।";
+  if (expires_at && (Number.isNaN(expires_at.getTime()) || expires_at < new Date())) errors.expires_at = "আজ বা পরের কোনো তারিখ দিন।";
+  if (Object.keys(errors).length) return { status: "error", errors, message: "চিহ্নিত ঘরগুলো ঠিক করুন।" };
+
+  const { error } = await sb.from("coupons").insert({
+    code, kind, value, min_order, max_discount, usage_limit, expires_at: expires_at?.toISOString() ?? null,
+  });
+  if (error?.code === "23505") return { status: "error", errors: { code: "এই কোড আগে থেকেই আছে।" }, message: "অন্য কোড দিন।" };
+  if (error) return { status: "error", message: `সংরক্ষণ হয়নি: ${error.message}` };
+  revalidatePath("/admin/coupons");
+  return { status: "saved", message: `কুপন ${code} তৈরি হয়েছে।` };
+}
+
+export async function setCouponActive(code: string, active: boolean) {
+  const { sb } = await requireAdmin();
+  const { error } = await sb.from("coupons").update({ active }).eq("code", code);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/coupons");
+}
+
+/** Past orders keep the code and discount they were placed with. */
+export async function deleteCoupon(code: string) {
+  const { sb } = await requireAdmin();
+  const { error } = await sb.from("coupons").delete().eq("code", code);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/coupons");
 }

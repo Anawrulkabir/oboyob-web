@@ -30,7 +30,7 @@ export default async function AccountPage() {
   const [{ data: profile }, { data: orders }] = await Promise.all([
     sb.from("profiles").select("full_name, phone, email, address").eq("id", user.id).maybeSingle(),
     sb.from("orders")
-      .select("id, product_name, product_code, quantity, unit_price, status, created_at, product:products(slug)")
+      .select("id, product_name, product_code, quantity, unit_price, discount, status, created_at, product:products(slug)")
       .eq("customer_id", user.id).order("created_at", { ascending: false }).limit(50),
   ]);
 
@@ -64,7 +64,7 @@ export default async function AccountPage() {
                       <span className="text-ink-soft"> × {o.quantity}</span>
                     </p>
                     <p className="text-sm text-ink-soft">
-                      {o.unit_price != null && <>{formatPrice(o.unit_price * o.quantity)} / </>}
+                      {o.unit_price != null && <>{formatPrice(o.unit_price * o.quantity - (o.discount ?? 0))} / </>}
                       {dateFmt.format(new Date(o.created_at))}
                     </p>
                   </div>

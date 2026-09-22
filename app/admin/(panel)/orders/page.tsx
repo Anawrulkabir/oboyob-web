@@ -11,7 +11,7 @@ type Props = { searchParams: Promise<{ status?: string; error?: string }> };
 interface Order {
   id: string; product_id: string | null; product_code: string; product_name: string; unit_price: number | null;
   quantity: number; customer_name: string; customer_phone: string; customer_address: string;
-  note: string | null; status: OrderStatus; created_at: string;
+  note: string | null; status: OrderStatus; created_at: string; coupon_code: string | null; discount: number | null;
 }
 
 const dateFmt = new Intl.DateTimeFormat("bn-BD", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Dhaka" });
@@ -47,7 +47,7 @@ export default async function OrdersAdmin({ searchParams }: Props) {
       ) : (
         <ul className="mt-6 divide-y divide-line border-y border-line">
           {orders.map((o) => {
-            const total = o.unit_price != null ? formatPrice(o.unit_price * o.quantity) : null;
+            const total = o.unit_price != null ? formatPrice(o.unit_price * o.quantity - (o.discount ?? 0)) : null;
             return (
               <li key={o.id} className="grid gap-3 py-5 md:grid-cols-[1fr_1fr_auto]">
                 <div>
@@ -57,6 +57,9 @@ export default async function OrdersAdmin({ searchParams }: Props) {
                     <span className="tabular-nums text-ink-soft">{o.product_code}</span>
                   </p>
                   <p className="text-sm">পরিমাণ {o.quantity}{total && <> / মোট {total}</>}</p>
+                  {o.coupon_code && (
+                    <p className="text-sm text-leaf">কুপন {o.coupon_code} (−{formatPrice(o.discount ?? 0)})</p>
+                  )}
                 </div>
                 <div className="text-sm">
                   <p>{o.customer_name}</p>

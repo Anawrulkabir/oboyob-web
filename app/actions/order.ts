@@ -7,8 +7,9 @@ import { getServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { createSessionClient } from "@/lib/supabase/session";
 import { normalizeBdPhone, toAsciiDigits } from "@/lib/phone";
 import { notifyNewOrder, type OrderInfo } from "@/lib/notify";
+import { COUPON_CODE, couponErrorMessage, normalizeCouponCode } from "@/lib/coupon";
 
-export type OrderField = "name" | "phone" | "address" | "quantity" | "email";
+export type OrderField = "name" | "phone" | "address" | "quantity" | "email" | "coupon";
 
 export interface OrderState {
   status: "idle" | "success" | "error";
@@ -17,6 +18,8 @@ export interface OrderState {
   orderRef?: string;
   loggedIn?: boolean;
   emailed?: boolean;
+  /** Final amounts for the confirmation screen. */
+  discount?: number;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -31,6 +34,7 @@ export async function submitOrder(_prev: OrderState, form: FormData): Promise<Or
   const note = String(form.get("note") ?? "").trim().slice(0, 1000);
   const emailRaw = String(form.get("email") ?? "").trim().toLowerCase();
   const quantity = Number.parseInt(toAsciiDigits(String(form.get("quantity") ?? "1")), 10);
+  const coupon = normalizeCouponCode(String(form.get("coupon") ?? ""));
 
   const errors: OrderState["errors"] = {};
   if (name.length < 2) errors.name = "আপনার নাম লিখুন।";
@@ -75,8 +79,11 @@ export async function submitOrder(_prev: OrderState, form: FormData): Promise<Or
     p_customer_address: row.customer_address,
     p_customer_email: row.customer_email,
     p_note: row.note,
+    p_coupon_code: coupon || null,
   });
   if (error || !order) {
+    const couponMsg = couponErrorMessage(error?.message);
+    if (couponMsg) return { status: "error", errors: { coupon: couponMsg }, message: "কুপনটি সরিয়ে বা বদলে আবার চেষ্টা করুন।" };
     const left = error?.message.match(/OUT_OF_STOCK:(\d+)/)?.[1];
     if (left !== undefined) {
       refreshCatalog();
@@ -104,8 +111,24 @@ export async function submitOrder(_prev: OrderState, form: FormData): Promise<Or
     orderRef: String(data.id).slice(0, 8).toUpperCase(),
     loggedIn: !!userId,
     emailed: !!customerEmail && !!process.env.RESEND_API_KEY,
+    discount: data.discount ?? 0,
     message: "আপনার অর্ডার পেয়েছি।",
   };
+}
+
+export interface CouponCheck { ok: boolean; code?: string; discount?: number; message?: string }
+
+/** Order form "Apply" button: what this code takes off this order. Doesn't use up the coupon. */
+export async function checkCoupon(slug: string, rawCode: string, quantity: number): Promise<CouponCheck> {
+  const code = normalizeCouponCode(rawCode);
+  if (!COUPON_CODE.test(code)) return { ok: false, message: "কুপন কোডটি সঠিক নয়।" };
+  const qty = Math.min(20, Math.max(1, Math.floor(quantity) || 1));
+  const product = await getProductBySlug(slug);
+  const db = getServiceClient();
+  if (!product || !db) return { ok: false, message: "এখন কুপন যাচাই করা যাচ্ছে না।" };
+  const { data, error } = await db.rpc("check_coupon", { p_code: code, p_product_id: product.id, p_quantity: qty });
+  if (error) return { ok: false, message: couponErrorMessage(error.message) ?? "এখন কুপন যাচাই করা যাচ্ছে না।" };
+  return { ok: true, code, discount: Number(data) };
 }
 
 function refreshCatalog() {

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, startTransition } from "react";
 import Link from "next/link";
-import { submitOrder, type OrderState } from "@/app/actions/order";
+import { checkCoupon, submitOrder, type OrderState } from "@/app/actions/order";
 import { formatPrice } from "@/lib/format";
 import { site } from "@/lib/site";
 
@@ -29,6 +29,11 @@ export default function OrderForm({ slug, productName, productCode, price, stock
   const [qty, setQty] = useState(1);
   const [account, setAccount] = useState<{ email: string | null } | null>(null);
   const [prefilled, setPrefilled] = useState(false);
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{ code: string; discount: number } | null>(null);
+  const [couponMsg, setCouponMsg] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const doneRef = useRef<HTMLDivElement>(null);
   const e = state.errors ?? {};
@@ -74,7 +79,24 @@ export default function OrderForm({ slug, productName, productCode, price, stock
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  const total = price != null ? formatPrice(price * qty) : null;
+  async function applyCoupon(code = couponInput, forQty = qty) {
+    if (!code.trim()) return;
+    setChecking(true);
+    const r = await checkCoupon(slug, code, forQty).catch(() => ({ ok: false, message: "এখন কুপন যাচাই করা যাচ্ছে না।" }) as const);
+    setChecking(false);
+    if (r.ok && r.code) { setCoupon({ code: r.code, discount: r.discount ?? 0 }); setCouponMsg(null); }
+    else { setCoupon(null); setCouponMsg(r.message ?? "কুপন কোডটি সঠিক নয়।"); }
+  }
+
+  // The discount depends on the quantity (percentages, minimum order), so re-check when it changes.
+  useEffect(() => {
+    if (coupon) applyCoupon(coupon.code, qty);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qty]);
+
+  const subtotal = price != null ? price * qty : null;
+  const discount = coupon?.discount ?? 0;
+  const total = subtotal != null ? formatPrice(subtotal - discount) : null;
 
   if (stock <= 0 && state.status !== "success") {
     return (
@@ -94,7 +116,7 @@ export default function OrderForm({ slug, productName, productCode, price, stock
         <p className="font-display text-2xl">ধন্যবাদ, অর্ডার পেয়েছি।</p>
         <p className="mt-2 text-ink-soft">
           {productName} × {qty.toLocaleString("bn-BD")}
-          {total && <> / {total}</>}
+          {subtotal != null && <> / {formatPrice(subtotal - (state.discount ?? 0))}</>}
           {state.orderRef && <> / রেফারেন্স <span className="tabular-nums text-ink">#{state.orderRef}</span></>}
         </p>
         <ol className="mt-5 space-y-2 text-[15px]">
@@ -188,6 +210,40 @@ export default function OrderForm({ slug, productName, productCode, price, stock
         <textarea id="note" name="note" value={f.note} onChange={set("note")} rows={2} placeholder="ডেলিভারির সময় বা অন্য কিছু" className={input} />
       </Field>
 
+      <div>
+        <input type="hidden" name="coupon" value={coupon?.code ?? ""} />
+        {!couponOpen && !coupon ? (
+          <button type="button" onClick={() => setCouponOpen(true)} className="text-sm text-ink underline decoration-line underline-offset-4 hover:decoration-haldi">
+            কুপন কোড আছে?
+          </button>
+        ) : coupon ? (
+          <div className="flex items-center justify-between gap-3 border border-leaf/40 bg-leaf/5 px-3 py-2.5 text-sm">
+            <p className="text-leaf">
+              ✓ কুপন <span className="font-medium tabular-nums">{coupon.code}</span>
+              {coupon.discount > 0 && <> — {formatPrice(coupon.discount)} ছাড়</>}
+            </p>
+            <button type="button" onClick={() => { setCoupon(null); setCouponInput(""); setCouponOpen(false); }}
+              className="shrink-0 text-ink-soft underline underline-offset-4 hover:text-ink">সরান</button>
+          </div>
+        ) : (
+          <div>
+            <label htmlFor="coupon-code" className="text-sm text-ink-soft">কুপন কোড</label>
+            <div className="mt-1.5 flex gap-2">
+              <input id="coupon-code" value={couponInput} autoFocus autoCapitalize="characters" autoComplete="off" spellCheck={false}
+                onChange={(ev) => { setCouponInput(ev.target.value.toUpperCase()); setCouponMsg(null); }}
+                onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); applyCoupon(); } }}
+                placeholder="যেমন EID10" className={`${input} !mt-0 uppercase tracking-wider`}
+                aria-invalid={!!(couponMsg || e.coupon)} />
+              <button type="button" onClick={() => applyCoupon()} disabled={checking || !couponInput.trim()}
+                className="shrink-0 border border-ink px-4 hover:bg-ink hover:text-paper disabled:opacity-50">
+                {checking ? "…" : "প্রয়োগ করুন"}
+              </button>
+            </div>
+          </div>
+        )}
+        {(couponMsg || e.coupon) && <p role="alert" className="mt-1.5 text-sm text-sindoor">{couponMsg ?? e.coupon}</p>}
+      </div>
+
       {state.status === "error" && state.message && (
         <p role="alert" className="text-sm text-sindoor">
           {state.message}{" "}
@@ -197,7 +253,15 @@ export default function OrderForm({ slug, productName, productCode, price, stock
 
       <div className="flex flex-col gap-2 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
         {total ? (
-          <p><span className="text-ink-soft">মোট </span><span className="text-xl tabular-nums">{total}</span></p>
+          <div>
+            {discount > 0 && (
+              <p className="text-sm text-ink-soft">
+                <span className="tabular-nums line-through">{formatPrice(subtotal)}</span>{" "}
+                <span className="text-leaf">−{formatPrice(discount)}</span>
+              </p>
+            )}
+            <p><span className="text-ink-soft">মোট </span><span className="text-xl tabular-nums">{total}</span></p>
+          </div>
         ) : (
           <p className="text-sm text-ink-soft">দাম ফোনে কনফার্ম করা হবে।</p>
         )}

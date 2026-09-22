@@ -13,8 +13,8 @@ and the order form tells customers to message on Facebook.
 
 ## Supabase
 1. SQL editor → run, in order: migrations/0001_init.sql, 0002_admin.sql,
-   0003_customers.sql, 0004_stock.sql, then seed.sql.
-   Already live? Just run 0004_stock.sql, then set each product's stock in /admin.
+   0003_customers.sql, 0004_stock.sql, 0005_coupons.sql, then seed.sql.
+   Already live? Run only the migrations you haven't run yet, in order.
 2. Set the price (seeded as NULL — not provided):
    update products set price = <TAKA> where product_code = 'OB-C-001';
 3. Photos: public Storage bucket "products" → upload → insert into product_images
@@ -40,6 +40,11 @@ What it does:
   At 0 the shop shows "Sold out" and ordering stops; ≤3 shows "মাত্র Nটি বাকি".
   Cancelling an order puts its pieces back. Edit stock on the product page or
   right in the product list.
+- Coupons (/admin/coupons): % or ৳ off, optional minimum order, maximum
+  discount, usage limit and expiry date. Customers tap "কুপন কোড আছে?" on the
+  order form. The database validates and counts the coupon in the same
+  transaction as the order; cancelling an order frees the use again.
+- Product URLs are made from the product code (OB-S-002 → /product/ob-s-002).
 - Images: multi-upload straight to Supabase Storage (phone photos are resized
   in the browser), reorder, set main image, alt text, delete.
 - Orders: list, filter by status, update status, tap-to-call.
@@ -117,8 +122,8 @@ Who gets what:
 
 ## Product identity
 - id: UUID primary key, used by all relations
-- product_code: OB-{S|J|C|3P}-NNN, assigned manually, never derived from name, never changes
-- slug: URL only
+- product_code: OB-{S|J|C|3P}-NNN, assigned by the database, never derived from name, never changes
+- slug: URL only — set automatically from the product code on create
 
 ## Deploy (Vercel)
 1. Push to GitHub → Import in Vercel.
