@@ -54,24 +54,46 @@ Email code (free, always on):
   smtp-relay.brevo.com, port 587, login + SMTP key from Brevo → SMTP & API,
   sender = the email you verified in Brevo. (Resend works too if you own a domain.)
 
+Google (free):
+1. console.cloud.google.com → create a project → APIs & Services →
+   OAuth consent screen: External, app name, support email, add your domain;
+   publish the app ("In production").
+2. Credentials → Create credentials → OAuth client ID → Web application.
+   Authorized redirect URIs: the callback URL shown in
+   Supabase → Authentication → Providers → Google
+   (https://YOUR-PROJECT.supabase.co/auth/v1/callback).
+3. Supabase → Authentication → Providers → Google: enable, paste Client ID + Secret.
+4. Set NEXT_PUBLIC_AUTH_GOOGLE=1.
+
 Facebook (free):
 1. developers.facebook.com → Create app → "Authenticate and request data from
    users with Facebook Login". Add privacy policy URL; switch the app to Live.
 2. Supabase → Authentication → Providers → Facebook: paste App ID + Secret.
    Copy Supabase's callback URL into Facebook Login → Valid OAuth Redirect URIs.
-3. Supabase → Authentication → URL Configuration: Site URL = your domain,
-   add https://yourdomain/auth/callback to Redirect URLs.
-4. Set NEXT_PUBLIC_AUTH_FACEBOOK=1.
+3. Set NEXT_PUBLIC_AUTH_FACEBOOK=1.
 
-Mobile number (SMS costs money — no free option exists for Bangladesh):
-- Cheapest: your own BD gateway (e.g. BulkSMSBD, pay per SMS, no monthly fee).
+For both Google and Facebook: Supabase → Authentication → URL Configuration:
+Site URL = your domain, and add https://yourdomain/auth/callback** to Redirect URLs
+(plus http://localhost:3000/auth/callback** for local dev).
+A customer who uses the same email with Google, Facebook and email-code login
+lands on the same account (Supabase links verified emails automatically).
+
+Mobile number (SMS OTP — costs money per SMS, no free option for Bangladesh):
+- Default Supabase way (no code, pick a provider in the dashboard):
+  1. Supabase → Authentication → Providers → Phone: enable.
+  2. Choose the SMS provider — Twilio, Twilio Verify, MessageBird, Vonage or
+     Textlocal — and paste its credentials (e.g. Twilio: Account SID,
+     Auth Token, Message Service SID).
+  3. Set NEXT_PUBLIC_AUTH_PHONE=1.
+  Numbers are sent as +8801XXXXXXXXX; customers type 01XXXXXXXXX.
+- Cheaper: your own BD gateway (e.g. BulkSMSBD, pay per SMS, no monthly fee)
+  through the Send SMS hook — this replaces the provider above:
   1. Set SMS_API_URL (see .env.example).
   2. Supabase → Authentication → Providers → Phone: enable.
   3. Supabase → Authentication → Hooks → Send SMS → HTTPS →
      https://yourdomain/api/auth/sms-hook → generate secret →
      put it in SUPABASE_SMS_HOOK_SECRET.
   4. Set NEXT_PUBLIC_AUTH_PHONE=1.
-- Or pick Twilio / MessageBird / Vonage in Supabase's Phone provider (pricier).
 
 ## Notifications
 All optional; never block an order (sent after the response).

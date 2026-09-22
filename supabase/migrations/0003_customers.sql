@@ -18,7 +18,7 @@ create policy "admin read profiles" on profiles for select using (is_admin());
 create trigger profiles_updated_at before update on profiles
   for each row execute function set_updated_at();
 
--- Auto-create a profile for every new sign-in (email, phone or Facebook).
+-- Auto-create a profile for every new sign-in (email, phone, Google or Facebook).
 create or replace function handle_new_user() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare p text := nullif(new.phone, '');

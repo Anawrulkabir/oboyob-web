@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState, useEffect, useState, startTransition } from "react";
-import { authFlow, signInWithFacebook, type AuthState } from "@/app/actions/auth";
+import { authFlow, signInWithOAuth, type AuthState } from "@/app/actions/auth";
 
-interface Props { next: string; phone: boolean; facebook: boolean; error?: string }
+interface Props { next: string; phone: boolean; google: boolean; facebook: boolean; error?: string }
 
 const input = "mt-1.5 w-full border border-line bg-paper px-3 py-3 text-[17px] outline-none focus:border-ink";
 
-export default function LoginPanel({ next, phone, facebook, error }: Props) {
+export default function LoginPanel({ next, phone, google, facebook, error }: Props) {
   const [method, setMethod] = useState<"phone" | "email">(phone ? "phone" : "email");
   const [state, act, pending] = useActionState<AuthState, FormData>(authFlow, { step: "start" });
   const [cooldown, setCooldown] = useState(0);
@@ -73,18 +73,42 @@ export default function LoginPanel({ next, phone, facebook, error }: Props) {
   // --------------------------------------------------------- step 1: start
   return (
     <div className="space-y-6">
-      {facebook && (
-        <form action={signInWithFacebook}>
-          <input type="hidden" name="next" value={next} />
-          <button className="flex w-full items-center justify-center gap-3 bg-[#1877F2] py-3.5 text-white hover:bg-[#166fe0]">
-            <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5 fill-current"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"/></svg>
-            Facebook দিয়ে চালিয়ে যান
-          </button>
-        </form>
+      {(google || facebook) && (
+        <div className="space-y-3">
+          {google && (
+            <form action={signInWithOAuth}>
+              <input type="hidden" name="provider" value="google" />
+              <input type="hidden" name="next" value={next} />
+              <button className="flex w-full items-center justify-center gap-3 border border-line bg-white py-3.5 text-[#1f1f1f] hover:bg-[#f7f7f7]">
+                <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5">
+                  <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.46a5.52 5.52 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.58-5.17 3.58-8.81z"/>
+                  <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.9l-3.88-3.01c-1.07.72-2.45 1.15-4.06 1.15-3.13 0-5.78-2.11-6.72-4.95H1.27v3.11A12 12 0 0 0 12 24z"/>
+                  <path fill="#FBBC05" d="M5.28 14.29a7.2 7.2 0 0 1 0-4.58V6.6H1.27a12 12 0 0 0 0 10.8l4.01-3.11z"/>
+                  <path fill="#EA4335" d="M12 4.77c1.76 0 3.34.61 4.59 1.8l3.44-3.44A11.94 11.94 0 0 0 12 0 12 12 0 0 0 1.27 6.6l4.01 3.11C6.22 6.88 8.87 4.77 12 4.77z"/>
+                </svg>
+                Google দিয়ে চালিয়ে যান
+              </button>
+            </form>
+          )}
+          {facebook && (
+            <form action={signInWithOAuth}>
+              <input type="hidden" name="provider" value="facebook" />
+              <input type="hidden" name="next" value={next} />
+              <button className="flex w-full items-center justify-center gap-3 bg-[#1877F2] py-3.5 text-white hover:bg-[#166fe0]">
+                <svg aria-hidden viewBox="0 0 24 24" className="h-5 w-5 fill-current"><path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.96.93-1.96 1.89v2.25h3.33l-.53 3.49h-2.8V24C19.61 23.1 24 18.1 24 12.07z"/></svg>
+                Facebook দিয়ে চালিয়ে যান
+              </button>
+            </form>
+          )}
+        </div>
       )}
-      {error === "facebook" && <p role="alert" className="text-sm text-sindoor">Facebook লগইন সম্পন্ন হয়নি। আবার চেষ্টা করুন বা অন্য উপায়ে লগইন করুন।</p>}
+      {(error === "google" || error === "facebook") && (
+        <p role="alert" className="text-sm text-sindoor">
+          {error === "google" ? "Google" : "Facebook"} লগইন সম্পন্ন হয়নি। আবার চেষ্টা করুন বা অন্য উপায়ে লগইন করুন।
+        </p>
+      )}
 
-      {facebook && (
+      {(google || facebook) && (
         <div className="flex items-center gap-3 text-sm text-ink-soft">
           <span className="h-px flex-1 bg-line" /> অথবা <span className="h-px flex-1 bg-line" />
         </div>
