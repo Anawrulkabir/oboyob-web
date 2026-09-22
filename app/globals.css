@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------
+   Design tokens. Change the brand here — components only use these.
+   Palette taken from the logo: ink silhouette + haldi (turmeric) aanchal.
+   ------------------------------------------------------------------ */
+:root {
+  --paper: #fbf8f2;        /* page background, warm ivory */
+  --paper-deep: #f3ece0;   /* image wells, quiet panels */
+  --ink: #231f1b;          /* primary text */
+  --ink-soft: #6b6157;     /* secondary text */
+  --line: #e3d9c8;         /* hairlines, borders */
+  --haldi: #a8742a;        /* accent for text / links (AA on paper) */
+  --haldi-soft: #e2b25f;   /* accent fill, from the logo sari */
+  --leaf: #4f6a3d;         /* available */
+  --sindoor: #9b3325;      /* errors, sold out */
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-haldi: var(--haldi);
+  --color-haldi-soft: var(--haldi-soft);
+  --color-leaf: var(--leaf);
+  --color-sindoor: var(--sindoor);
+
+  --font-display: var(--font-serif-bn), "Noto Serif Bengali", Georgia, serif;
+  --font-sans: var(--font-sans-bn), "Hind Siliguri", system-ui, sans-serif;
+}
+
+html { scroll-behavior: smooth; background: var(--paper); color: var(--ink); -webkit-text-size-adjust: 100%; }
+body { font-family: var(--font-sans); line-height: 1.7; }
+
+/* Bangla conjuncts need room: never let headings get too tight. */
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.35; font-weight: 500; }
+
+@layer base {
+  :focus-visible { outline: 2px solid var(--haldi); outline-offset: 3px; }
+}
+
+::selection { background: var(--haldi-soft); color: var(--ink); }
+
+/* Arch frame — echoes a temple niche / jharokha. Used once, in the hero. */
+.arch { border-radius: 999px 999px 0 0; overflow: hidden; }
+
+/* Aanchal stripe: the sari border from the logo, used as a quiet divider. */
+.paar {
+  height: 10px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--ink) 0 2px, transparent 2px 6px,
+    var(--haldi-soft) 6px 14px, transparent 14px 18px
+  );
+  opacity: 0.85;
+}
+
+/* Placeholder when a product has no photo yet: diagonal aanchal weave. */
+.weave {
+  background:
+    repeating-linear-gradient(
+      -38deg,
+      transparent 0 22px,
+      color-mix(in srgb, var(--haldi-soft) 35%, transparent) 22px 30px,
+      transparent 30px 34px,
+      color-mix(in srgb, var(--ink) 10%, transparent) 34px 35px
+    ),
+    var(--paper-deep);
+}
+
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; scroll-behavior: auto !important; }
+}
