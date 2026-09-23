@@ -134,6 +134,11 @@ Mobile number (SMS OTP — costs money per SMS, no free option for Bangladesh):
 
 ## Notifications
 All optional; never block an order (sent after the response).
+- Seller, WhatsApp (free, CallMeBot): from the admin's phone send
+  "I allow callmebot to send me messages" on WhatsApp to CallMeBot's number
+  (callmebot.com → WhatsApp) → it replies with an API key → Vercel:
+  CALLMEBOT_PHONE=+8801XXXXXXXXX, CALLMEBOT_APIKEY=<key>. Several admins:
+  comma-separate both, same order. Unofficial service: keep email as backup.
 - Seller, Telegram (free): message @BotFather → /newbot → token. Send your bot
   any message, open https://api.telegram.org/bot<TOKEN>/getUpdates, copy chat.id.
 - Email, no domain — Gmail (free, ~500/day):

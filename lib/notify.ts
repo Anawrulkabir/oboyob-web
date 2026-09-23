@@ -32,6 +32,28 @@ async function telegram(text: string) {
   } catch (e) { console.error("telegram", e); }
 }
 
+/**
+ * WhatsApp to the admin's own phone via CallMeBot (free, personal alerts).
+ * CALLMEBOT_PHONE = +8801XXXXXXXXX and CALLMEBOT_APIKEY = the key CallMeBot
+ * sent that phone. Several admins: comma-separate both, in the same order.
+ */
+async function whatsapp(text: string) {
+  const phones = (process.env.CALLMEBOT_PHONE ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const keys = (process.env.CALLMEBOT_APIKEY ?? "").split(",").map((s) => s.trim());
+  await Promise.all(phones.map(async (raw, i) => {
+    const key = keys[i] ?? keys[0];
+    if (!key) return;
+    // Accept 01XXXXXXXXX, 8801XXXXXXXXX or +8801XXXXXXXXX.
+    const phone = raw.startsWith("+") ? raw : raw.startsWith("880") ? `+${raw}` : `+88${raw}`;
+    try {
+      const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(key)}`;
+      const r = await fetch(url);
+      const body = await r.text();
+      if (!r.ok || /error|invalid|not allowed/i.test(body)) console.error("whatsapp", phone, r.status, body.slice(0, 200));
+    } catch (e) { console.error("whatsapp", phone, e); }
+  }));
+}
+
 /** "Name <a@b.c>" → { name, email } */
 function parseFrom(from: string) {
   const m = from.match(/^\s*"?([^"<]*)"?\s*<([^>]+)>\s*$/);
@@ -205,7 +227,16 @@ function orderTable(o: Order) {
 
 export async function notifyNewOrder(o: Order) {
   const admin = `${site.url}/admin/orders/${o.id}`;
+  const zoneLabel = deliveryZone(o.delivery_zone)?.label ?? "";
   await Promise.all([
+    whatsapp(
+      `🛍 *নতুন অর্ডার #${orderRef(o.id)}* — ${tk(o.total)} (COD)\n` +
+      o.items.map((i) => `• ${i.product_name} (${i.product_code}) × ${i.quantity}`).join("\n") + "\n" +
+      (o.coupon_code ? `🏷 ${o.coupon_code} (−${tk(o.discount)})\n` : "") +
+      `🚚 ${zoneLabel} ${tk(o.delivery_charge)}\n\n` +
+      `👤 ${o.customer_name}\n📞 ${o.customer_phone}\n📍 ${o.customer_address}` +
+      (o.note ? `\n📝 ${o.note}` : "") + `\n\n${admin}`,
+    ),
     telegram(
       `🛍 <b>নতুন অর্ডার</b> #${orderRef(o.id)} — ${tk(o.total)} (COD)\n` +
       o.items.map((i) => `• ${esc(i.product_name)} (${i.product_code}) × ${i.quantity}`).join("\n") + "\n" +
