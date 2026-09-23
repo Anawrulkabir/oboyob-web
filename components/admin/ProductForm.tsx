@@ -132,6 +132,12 @@ export default function ProductForm({ product }: { product?: Product }) {
           <input type="checkbox" name="featured" defaultChecked={product?.featured ?? false} className="h-4 w-4 accent-ink" />
           হোমপেজে ফিচার্ড
         </label>
+        {!product && (
+          <label className="flex items-center gap-2">
+            <input type="checkbox" name="announce" defaultChecked className="h-4 w-4 accent-ink" />
+            পুরোনো গ্রাহকদের ইমেইলে নতুন পণ্যের খবর দিন
+          </label>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-4 border-t border-line pt-6">

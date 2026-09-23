@@ -1,6 +1,9 @@
 import Link from "next/link";
 import ProductForm from "@/components/admin/ProductForm";
 
+// Creating a product can also email past customers about it (runs after the response).
+export const maxDuration = 60;
+
 export default function NewProduct() {
   return (
     <div>

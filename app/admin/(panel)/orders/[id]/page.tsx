@@ -11,6 +11,7 @@ import { loadOrder, orderRef } from "@/lib/orders";
 import { emailConfigured } from "@/lib/notify";
 import { site } from "@/lib/site";
 import { btnQuiet } from "@/components/admin/styles";
+import PhoneActions from "@/components/admin/PhoneActions";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ compose?: string; error?: string }> };
 
@@ -79,7 +80,7 @@ export default async function OrderDetail({ params, searchParams }: Props) {
           <div>
             <h2 className="text-lg">গ্রাহক</h2>
             <p className="mt-2">{o.customer_name}</p>
-            <a href={`tel:${o.customer_phone}`} className="tabular-nums underline underline-offset-4">{o.customer_phone}</a>
+            <div className="mt-1"><PhoneActions phone={o.customer_phone} /></div>
             <p className="mt-1 whitespace-pre-line text-sm text-ink-soft">{o.customer_address}</p>
             {o.customer_email && <p className="text-sm text-ink-soft">{o.customer_email}</p>}
             {o.note && <p className="mt-2 text-sm italic text-ink-soft">“{o.note}”</p>}

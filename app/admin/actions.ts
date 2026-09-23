@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { emailHtml, notifyStatusChange, sendEmail, slipUrl } from "@/lib/notify";
 import { loadOrder, orderRef } from "@/lib/orders";
 import { renderSlipPdf } from "@/lib/slip-pdf";
+import { announceProduct } from "@/lib/announce";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { createSessionClient } from "@/lib/supabase/session";
@@ -104,6 +105,15 @@ export async function saveProduct(id: string | null, _prev: ProductFormState, fo
   const { data, error } = await sb.from("products").insert({ ...row, category }).select("id").single();
   if (error || !data) return dbError(error);
 
+  // "Email past customers about it" (create form) — sent after the page responds.
+  if (form.get("announce") === "on" && row.stock > 0) {
+    const productId = data.id as string;
+    after(async () => {
+      const r = await announceProduct(productId);
+      if (!r.ok) console.error("announce", productId, r.error);
+    });
+  }
+
   // Photos picked on the create form were already uploaded to Storage by the browser.
   const images = parseImageUrls(form.get("images"));
   if (images.length) {
@@ -127,6 +137,22 @@ export async function setProductFlag(id: string, field: "featured" | "archived",
   const { error } = await sb.from("products").update(patch).eq("id", id);
   if (error) throw new Error(error.message);
   refreshSite();
+}
+
+export interface AnnounceState { status: "idle" | "sent" | "error"; message?: string }
+
+/** Product page "email past customers" button. */
+export async function announceProductAction(id: string, _prev: AnnounceState): Promise<AnnounceState> {
+  await requireAdmin();
+  const r = await announceProduct(id);
+  revalidatePath(`/admin/products/${id}`);
+  if (!r.ok) return { status: "error", message: r.error };
+  return {
+    status: "sent",
+    message: `${r.sent.toLocaleString("bn-BD")} জনকে পাঠানো হয়েছে` +
+      (r.failed ? `, ${r.failed.toLocaleString("bn-BD")}টি যায়নি` : "") +
+      (r.skipped ? ` (দৈনিক সীমার কারণে ${r.skipped.toLocaleString("bn-BD")} জন বাকি)` : "") + "।",
+  };
 }
 
 /** Quick stock update from the product list. */

@@ -19,4 +19,6 @@ export const site = {
     "অবয়ব — দেশীয় তাঁতের শাড়ি, গহনা ও কম্বো। সারা বাংলাদেশে হোম ডেলিভারি।",
   url: siteUrl(),
   facebook: "https://www.facebook.com/share/1D87s4YsPs/",
+  /** New-order alerts (lib/notify.ts); SELLER_EMAIL overrides it. */
+  adminEmail: "oboyobfasion@gmail.com",
 } as const;

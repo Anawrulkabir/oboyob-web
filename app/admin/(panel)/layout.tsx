@@ -21,6 +21,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
           <nav className="flex gap-5">
             <Link href="/admin" className="hover:text-haldi">পণ্য</Link>
             <Link href="/admin/orders" className="hover:text-haldi">অর্ডার</Link>
+            <Link href="/admin/customers" className="hover:text-haldi">গ্রাহক</Link>
             <Link href="/admin/coupons" className="hover:text-haldi">কুপন</Link>
             <Link href="/" target="_blank" className="text-ink-soft hover:text-ink">সাইট দেখুন</Link>
           </nav>

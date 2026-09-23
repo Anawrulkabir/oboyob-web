@@ -7,6 +7,7 @@ import { formatPrice } from "@/lib/format";
 import { deliveryZone } from "@/lib/delivery";
 import { ORDER_SELECT, orderRef, type Order } from "@/lib/orders";
 import { btnQuiet } from "@/components/admin/styles";
+import PhoneActions from "@/components/admin/PhoneActions";
 
 type Props = { searchParams: Promise<{ status?: string; error?: string }> };
 
@@ -58,7 +59,7 @@ export default async function OrdersAdmin({ searchParams }: Props) {
               </div>
               <div className="text-sm">
                 <p>{o.customer_name}</p>
-                <a href={`tel:${o.customer_phone}`} className="tabular-nums underline underline-offset-4">{o.customer_phone}</a>
+                <PhoneActions phone={o.customer_phone} />
                 <p className="mt-1 whitespace-pre-line text-ink-soft">{o.customer_address}</p>
                 {o.note && <p className="mt-1 italic text-ink-soft">“{o.note}”</p>}
                 {o.emailed_at && <p className="mt-1 text-xs text-leaf">✉ ইমেইল পাঠানো হয়েছে</p>}

@@ -5,7 +5,7 @@
  *   Seller:   Telegram (free, instant push)  +  email
  *   Customer: email (English, like the payment slip)  +  SMS via any HTTP gateway (optional)
  */
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 import { site } from "@/lib/site";
 import type { OrderStatus } from "@/lib/order-status";
 import { deliveryZone } from "@/lib/delivery";
@@ -40,6 +40,9 @@ function parseFrom(from: string) {
 
 export interface Attachment { filename: string; content: Buffer }
 
+/** Where new-order alerts go. SELLER_EMAIL in Vercel overrides it. */
+export const adminEmail = () => process.env.SELLER_EMAIL || site.adminEmail;
+
 const smtpConfigured = () => !!(process.env.SMTP_USER && process.env.SMTP_PASS);
 /** Sender: EMAIL_FROM, or the SMTP login itself (Gmail only sends as the signed-in address). */
 const fromAddress = () => process.env.EMAIL_FROM || (smtpConfigured() ? `${site.nameEn} <${process.env.SMTP_USER}>` : "");
@@ -53,22 +56,33 @@ export const emailConfigured = () =>
  *   1. SMTP — e.g. Gmail with an App Password (SMTP_USER + SMTP_PASS; host defaults to Gmail)
  *   2. Brevo (BREVO_API_KEY)   3. Resend (RESEND_API_KEY, needs a domain)
  */
-export async function sendEmail(to: string, subject: string, html: string, attachments: Attachment[] = []):
-  Promise<{ ok: true } | { ok: false; error: string }> {
+// One pooled SMTP connection per server instance, so a batch of emails
+// (new-product announcements) doesn't log in to Gmail once per message.
+let smtp: Transporter | null = null;
+function smtpTransport() {
+  if (!smtp) {
+    const port = Number(process.env.SMTP_PORT || 465);
+    smtp = nodemailer.createTransport({
+      pool: true,
+      maxConnections: 1,
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port,
+      secure: port === 465,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS!.replace(/\s+/g, "") }, // Google shows app passwords with spaces
+    });
+  }
+  return smtp;
+}
+
+export async function sendEmail(to: string, subject: string, html: string, attachments: Attachment[] = [],
+  headers: Record<string, string> = {}): Promise<{ ok: true } | { ok: false; error: string }> {
   const from = fromAddress();
   if (!from || !emailConfigured()) return { ok: false, error: "Email is not set up — add SMTP_USER + SMTP_PASS (Gmail app password) in Vercel." };
   if (!to) return { ok: false, error: "No recipient." };
   try {
     if (smtpConfigured()) {
-      const port = Number(process.env.SMTP_PORT || 465);
-      const transport = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || "smtp.gmail.com",
-        port,
-        secure: port === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS!.replace(/\s+/g, "") }, // Google shows app passwords with spaces
-      });
-      await transport.sendMail({
-        from, to, subject, html, text: htmlToText(html), replyTo: from,
+      await smtpTransport().sendMail({
+        from, to, subject, html, text: htmlToText(html), replyTo: from, headers,
         attachments: attachments.map((a) => ({ filename: a.filename, content: a.content, contentType: "application/pdf" })),
       });
       return { ok: true };
@@ -79,7 +93,7 @@ export async function sendEmail(to: string, subject: string, html: string, attac
         method: "POST",
         headers: { "api-key": process.env.BREVO_API_KEY, "Content-Type": "application/json", accept: "application/json" },
         body: JSON.stringify({
-          sender: parseFrom(from), to: [{ email: to }], subject, htmlContent: html, textContent: htmlToText(html),
+          sender: parseFrom(from), to: [{ email: to }], subject, htmlContent: html, textContent: htmlToText(html), headers,
           ...(attachments.length && { attachment: attachments.map((a) => ({ name: a.filename, content: a.content.toString("base64") })) }),
         }),
       });
@@ -88,7 +102,7 @@ export async function sendEmail(to: string, subject: string, html: string, attac
         method: "POST",
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          from, to, subject, html, text: htmlToText(html),
+          from, to, subject, html, text: htmlToText(html), headers,
           ...(attachments.length && { attachments: attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }),
         }),
       });
@@ -200,10 +214,13 @@ export async function notifyNewOrder(o: Order) {
       `👤 ${esc(o.customer_name)}\n📞 ${o.customer_phone}\n📍 ${esc(o.customer_address)}` +
       (o.note ? `\n📝 ${esc(o.note)}` : "") + `\n\n${admin}`,
     ),
-    process.env.SELLER_EMAIL &&
-      email(process.env.SELLER_EMAIL, `New order #${orderRef(o.id)} — ${tk(o.total)}`,
-        emailHtml(`A new order has arrived.${o.note ? `\n\nCustomer note: ${o.note}` : ""}`, o,
-          `<p style="margin-top:18px"><a href="${admin}" style="color:#a8742a">Open in admin</a></p>`)),
+    email(adminEmail(), `🛍 New order #${orderRef(o.id)} — ${tk(o.total)} — ${o.customer_name}`,
+      emailHtml(
+        `A new order has arrived.\n\nCustomer: ${o.customer_name}\nPhone: ${o.customer_phone}` +
+        (o.customer_email ? `\nEmail: ${o.customer_email}` : "") +
+        (o.note ? `\n\nCustomer note: ${o.note}` : ""), o,
+        `<p style="margin-top:18px"><a href="${admin}" style="display:inline-block;background:#231f1b;color:#fbf8f2;padding:10px 18px;text-decoration:none">Open order in admin</a>
+         &nbsp; <a href="tel:${o.customer_phone}" style="color:#a8742a">Call ${o.customer_phone}</a></p>`)),
     o.customer_email &&
       email(o.customer_email, `We've received your order #${orderRef(o.id)}`,
         emailHtml(`Dear ${o.customer_name},\n\nThank you for shopping with ${site.nameEn}. We have received your order and will call you shortly to confirm it. Payment is cash on delivery.`, o,

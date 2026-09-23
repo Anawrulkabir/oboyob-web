@@ -14,7 +14,7 @@ and the order form tells customers to message on Facebook.
 ## Supabase
 1. SQL editor → run, in order: migrations/0001_init.sql, 0002_admin.sql,
    0003_customers.sql, 0004_stock.sql, 0005_coupons.sql, 0006_cart_checkout.sql,
-   then seed.sql.
+   0007_announcements.sql, then seed.sql.
    Already live? Run only the migrations you haven't run yet, in order.
 2. Set the price (seeded as NULL — not provided):
    update products set price = <TAKA> where product_code = 'OB-C-001';
@@ -60,6 +60,15 @@ What it does:
 - Product URLs are made from the product code (OB-S-002 → /product/ob-s-002).
 - Images: multi-upload straight to Supabase Storage (phone photos are resized
   in the browser), reorder, set main image, alt text, delete.
+- Customers (/admin/customers): everyone who ordered (grouped by phone) plus
+  account holders — orders, total spent, last order, search; phone numbers
+  have Copy and Call buttons (also on every order).
+- New-product email: tick "email past customers" when creating a product, or
+  use the button on the product page. Goes once per product to every customer
+  email we have, with a signed unsubscribe link (and Gmail's one-click
+  unsubscribe). Capped at 400 per product for Gmail's daily limit.
+- New orders email the admin at oboyobfasion@gmail.com (lib/site.ts →
+  adminEmail; SELLER_EMAIL in Vercel overrides it).
 - Orders: list, filter by status, open an order, update status, tap-to-call,
   download the slip. Setting an order to "confirmed" opens an email composer
   (English, fully editable) with the payment slip PDF attached → "Send email",

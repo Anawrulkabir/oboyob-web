@@ -8,7 +8,13 @@ import ProductForm from "@/components/admin/ProductForm";
 import ImageManager from "@/components/admin/ImageManager";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import { btnQuiet } from "@/components/admin/styles";
+import AnnouncePanel from "@/components/admin/AnnouncePanel";
+import { announcementRecipients } from "@/lib/announce";
+import { emailConfigured } from "@/lib/notify";
 import type { Product } from "@/types/product";
+
+// Sending the new-product email to many customers can take a while.
+export const maxDuration = 60;
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> };
 
@@ -21,6 +27,10 @@ export default async function EditProduct({ params, searchParams }: Props) {
   const { data } = await sb.from("products").select(PRODUCT_SELECT).eq("id", id).maybeSingle();
   if (!data) notFound();
   const product = normalizeProduct(data as unknown as Product);
+  const [{ data: ann }, recipients] = await Promise.all([
+    sb.from("products").select("announced_at, announced_count").eq("id", id).maybeSingle(),
+    announcementRecipients(),
+  ]);
 
   return (
     <div className="space-y-12">
@@ -39,6 +49,11 @@ export default async function EditProduct({ params, searchParams }: Props) {
       </div>
 
       <ImageManager productId={product.id} productName={product.name} images={product.images} />
+
+      {!product.archived && (
+        <AnnouncePanel productId={product.id} recipients={recipients.length} announcedAt={ann?.announced_at ?? null}
+          announcedCount={ann?.announced_count ?? null} available={product.available} emailReady={emailConfigured()} />
+      )}
 
       <section>
         <h2 className="mb-6 text-xl">তথ্য</h2>
