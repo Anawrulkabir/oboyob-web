@@ -24,14 +24,13 @@ export const metadata: Metadata = {
   metadataBase: new URL(site.url),
   title: { default: `${site.nameBn} — ${site.nameEn}`, template: `%s | ${site.nameBn} — ${site.nameEn}` },
   description: site.description,
-  icons: { icon: "/images/logo.png" },
   openGraph: {
     type: "website",
     locale: "bn_BD",
     siteName: `${site.nameBn} — ${site.nameEn}`,
     title: `${site.nameBn} — ${site.nameEn}`,
     description: site.description,
-    images: [{ url: "/images/logo-large.png", width: 1254, height: 1254, alt: "অবয়ব লোগো" }],
+    images: [{ url: "/images/og.jpg", width: 1200, height: 630, alt: `${site.nameBn} — ${site.nameEn} লোগো` }],
   },
 };
 

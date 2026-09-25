@@ -8,7 +8,7 @@ export default function Footer() {
     <footer className="mt-24 border-t border-line">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-12 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
         <div className="flex items-start gap-4">
-          <Image src="/images/logo.png" alt="" width={64} height={64} className="h-16 w-16" />
+          <Image src="/images/logo.png" alt="" width={62} height={80} className="h-20 w-auto" />
           <div>
             <p className="font-display text-xl">{site.nameBn}</p>
             <p className="text-sm text-ink-soft">{site.nameEn} · {site.tagline}</p>

@@ -4,7 +4,7 @@ export default function Availability({ available, stock, className = "" }: { ava
   return (
     <span className={`inline-flex items-center gap-1.5 ${!available ? "text-sindoor" : low ? "text-haldi" : "text-leaf"} ${className}`}>
       <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-current" />
-      {!available ? "Sold out · বিক্রি শেষ" : low ? `মাত্র ${stock!.toLocaleString("bn-BD")}টি বাকি` : "স্টকে আছে"}
+      {!available ? "Sold out · বিক্রি শেষ" : low ? `মাত্র ${stock!.toLocaleString("bn-BD")}টি বাকি` : "In Stock"}
     </span>
   );
 }

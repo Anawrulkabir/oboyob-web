@@ -21,7 +21,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="oboyob-slip-${orderRef(order.id)}.pdf"`,
+      "Content-Disposition": `attachment; filename="zeenah-slip-${orderRef(order.id)}.pdf"`,
       "Cache-Control": "private, no-store",
     },
   });

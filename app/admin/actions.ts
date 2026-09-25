@@ -284,7 +284,7 @@ export async function sendOrderEmail(orderId: string, _prev: EmailState, form: F
   const attachments = [];
   if (attach) {
     try {
-      attachments.push({ filename: `oboyob-slip-${orderRef(order.id)}.pdf`, content: await renderSlipPdf(order) });
+      attachments.push({ filename: `zeenah-slip-${orderRef(order.id)}.pdf`, content: await renderSlipPdf(order) });
     } catch (e) {
       console.error("slip pdf", order.id, e);
       return { status: "error", message: "Couldn't create the PDF slip, so nothing was sent. Untick “Attach payment slip” to send without it, or try again." };

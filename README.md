@@ -1,4 +1,4 @@
-# অবয়ব — Oboyob
+# জীনাহ — Zeenah
 
 Lightweight storefront: catalog, product pages, simple order form.
 Next.js 15 (App Router) · TypeScript · Tailwind v4 · Supabase · Vercel.

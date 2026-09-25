@@ -6,7 +6,7 @@ const POINTS = [
 
 export default function TrustStrip() {
   return (
-    <section aria-label="কেন অবয়ব" className="border-y border-line bg-paper-deep/60">
+    <section aria-label="কেন জীনাহ" className="border-y border-line bg-paper-deep/60">
       <ul className="mx-auto grid max-w-6xl gap-5 px-5 py-6 sm:grid-cols-3 sm:gap-8 sm:px-8 sm:py-8">
         {POINTS.map((p) => (
           <li key={p.title} className="flex items-start gap-3.5">

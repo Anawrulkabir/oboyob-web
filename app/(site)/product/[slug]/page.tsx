@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: `/product/${product.slug}`,
       images: image
         ? [{ url: image.image_url, alt: image.alt_text ?? product.name }]
-        : [{ url: "/images/logo-large.png", alt: site.nameBn }],
+        : [{ url: "/images/og.jpg", width: 1200, height: 630, alt: site.nameBn }],
     },
   };
 }

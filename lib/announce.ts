@@ -32,7 +32,7 @@ export function announcementHtml(p: Product, to: { email: string; name: string |
   return `<div style="background:#f3ece0;padding:24px 12px">
   <div style="font-family:Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;color:#231f1b;background:#fbf8f2;padding:32px 28px;line-height:1.6;font-size:15px;border-top:4px solid #a8742a">
     <table role="presentation" style="border-collapse:collapse;margin:0 0 22px"><tr>
-      <td style="padding:0 14px 0 0"><img src="${site.url}/images/logo.png" width="48" height="48" alt="${esc(site.nameEn)}" style="display:block;border:0"></td>
+      <td style="padding:0 14px 0 0"><img src="${site.url}/images/logo-mark.png" width="48" height="48" alt="${esc(site.nameEn)}" style="display:block;border:0"></td>
       <td><p style="font-size:20px;margin:0;letter-spacing:0.5px">${esc(site.nameEn.toUpperCase())}</p><p style="margin:0;color:#6b6157;font-size:13px">${esc(site.tagline)}</p></td>
     </tr></table>
     <p style="margin:0 0 16px">${first ? `Hi ${esc(first)},` : "Hello,"}</p>

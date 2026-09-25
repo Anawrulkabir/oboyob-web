@@ -9,6 +9,7 @@ import FacebookCTA from "@/components/FacebookCTA";
 import SectionHeading from "@/components/SectionHeading";
 import { CATEGORIES } from "@/lib/categories";
 import { getProducts } from "@/lib/products";
+import { site } from "@/lib/site";
 
 export const revalidate = 300;
 
@@ -51,9 +52,9 @@ export default async function HomePage() {
 
       <section className="border-t border-line">
         <div className="mx-auto max-w-2xl px-5 py-16 text-center sm:py-24">
-          <Image src="/images/logo.png" alt="" width={88} height={88} className="mx-auto h-[88px] w-[88px]" />
+          <Image src="/images/logo.png" alt={`${site.nameBn} — ${site.nameEn}`} width={124} height={160} className="mx-auto h-40 w-auto" />
           <p className="mt-6 font-display text-2xl leading-relaxed sm:text-3xl sm:leading-relaxed">
-            দেশের তাঁতির হাতে বোনা কাপড়, আর যত্নে বেছে নেওয়া গহনা — অবয়ব সেই সহজ সৌন্দর্যকেই পৌঁছে দেয় আপনার কাছে।
+            দেশের তাঁতির হাতে বোনা কাপড়, আর যত্নে বেছে নেওয়া গহনা — {site.nameBn} সেই সহজ সৌন্দর্যকেই পৌঁছে দেয় আপনার কাছে।
           </p>
           <p className="mt-4 text-sm tracking-wide text-haldi">Wear your identity.</p>
         </div>
