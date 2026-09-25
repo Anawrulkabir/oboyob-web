@@ -127,10 +127,10 @@ export async function renderSlipPdf(o: Order): Promise<Buffer> {
   doc.rect(0, 0, W, 118).fill(C.deep);
   doc.rect(0, 0, W, 5).fill(C.haldi);
   // A copy of the logo lives in assets/ — public/ isn't shipped with server functions on Vercel.
-  doc.image(L.logo, M, 30, { width: 58, height: 58 });
-  text(L, doc, site.nameEn.toUpperCase(), M + 72, 36, { size: 20, weight: "bold" });
-  text(L, doc, site.tagline, M + 72, 62, { size: 9.5, color: C.soft });
-  text(L, doc, site.url.replace(/^https?:\/\//, ""), M + 72, 76, { size: 9.5, color: C.soft });
+  doc.image(L.logo, M, 18, { height: 84 }); // full logo, width follows its proportions
+  text(L, doc, site.nameEn.toUpperCase(), M + 80, 36, { size: 20, weight: "bold" });
+  text(L, doc, site.tagline, M + 80, 62, { size: 9.5, color: C.soft });
+  text(L, doc, site.url.replace(/^https?:\/\//, ""), M + 80, 76, { size: 9.5, color: C.soft });
   text(L, doc, "PAYMENT SLIP", W - M - 220, 34, { size: 20, weight: "bold", width: 220, align: "right" });
   text(L, doc, `Order #${orderRef(o.id)}`, W - M - 220, 62, { size: 10.5, width: 220, align: "right" });
   text(L, doc, dateFmt.format(new Date(o.created_at)), W - M - 220, 77, { size: 9.5, color: C.soft, width: 220, align: "right" });

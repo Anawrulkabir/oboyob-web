@@ -22,7 +22,7 @@ export default function Navbar() {
         </div>
 
         <Link href="/" className="flex items-center gap-2.5" aria-label={`${site.nameBn} — হোম`}>
-          <Image src="/images/logo-mark.png" alt="" width={44} height={44} priority className="h-10 w-10 sm:h-11 sm:w-11" />
+          <Image src="/images/logo.png" alt="" width={43} height={56} priority className="h-[52px] w-auto sm:h-14" />
           <span className="font-display text-2xl leading-none">{site.nameBn}</span>
         </Link>
 
