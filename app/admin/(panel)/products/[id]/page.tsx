@@ -9,6 +9,8 @@ import ImageManager from "@/components/admin/ImageManager";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import { btnQuiet } from "@/components/admin/styles";
 import AnnouncePanel from "@/components/admin/AnnouncePanel";
+import ShareProduct from "@/components/admin/ShareProduct";
+import { site } from "@/lib/site";
 import { announcementRecipients } from "@/lib/announce";
 import { emailConfigured } from "@/lib/notify";
 import type { Product } from "@/types/product";
@@ -32,6 +34,8 @@ export default async function EditProduct({ params, searchParams }: Props) {
     announcementRecipients(),
   ]);
 
+  const productUrl = `${site.url}/product/${product.slug}`;
+
   return (
     <div className="space-y-12">
       <div>
@@ -41,7 +45,10 @@ export default async function EditProduct({ params, searchParams }: Props) {
             {product.name} <span className="ml-2 font-sans text-base tabular-nums text-ink-soft">{product.product_code}</span>
           </h1>
           {!product.archived && (
-            <Link href={`/product/${product.slug}`} target="_blank" className={btnQuiet}>সাইটে দেখুন</Link>
+            <div className="flex flex-wrap gap-2">
+              <ShareProduct url={productUrl} created={!!created} />
+              <Link href={`/product/${product.slug}`} target="_blank" className={btnQuiet}>সাইটে দেখুন</Link>
+            </div>
           )}
         </div>
         {created && <p className="mt-3 text-leaf">পণ্য তৈরি হয়েছে — কোড {product.product_code}।{product.images.length === 0 && " এখন ছবি যোগ করুন।"}</p>}
