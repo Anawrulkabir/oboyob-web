@@ -81,16 +81,19 @@ export default function CheckoutForm({ enabled }: { enabled: boolean }) {
   async function applyCoupon(code = couponInput) {
     if (!code.trim()) return;
     setChecking(true);
-    const r = await checkCoupon(code, lines).catch(() => ({ ok: false, message: "এখন কুপন যাচাই করা যাচ্ছে না।" }) as const);
+    const r = await checkCoupon(code, lines, f.phone).catch(() => ({ ok: false, message: "এখন কুপন যাচাই করা যাচ্ছে না।" }) as const);
     setChecking(false);
     if (r.ok && r.code) { setCoupon({ code: r.code, discount: r.discount ?? 0 }); setCouponMsg(null); }
     else { setCoupon(null); setCouponMsg(r.message ?? "কুপন কোডটি সঠিক নয়।"); }
   }
-  // Minimum order / percentages depend on the cart — re-check when it changes.
+  // Minimum order / percentages depend on the cart, personal coupons on the
+  // phone number — re-check when either changes.
   useEffect(() => {
-    if (coupon && cart.items.length) applyCoupon(coupon.code);
+    if (!coupon || !cart.items.length) return;
+    const t = setTimeout(() => applyCoupon(coupon.code), 500); // wait until typing stops
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [linesKey]);
+  }, [linesKey, f.phone]);
 
   const fee = DELIVERY_ZONES.find((z) => z.id === zone)?.fee ?? null;
   const discount = coupon?.discount ?? 0;

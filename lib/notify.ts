@@ -208,7 +208,7 @@ export function emailHtml(message: string, o?: Order, extra = "") {
 
 function orderTable(o: Order) {
   const cell = "padding:8px 0;border-bottom:1px solid #e3d9c8";
-  const rows = o.items.map((i) => `<tr><td style="${cell}">${esc(i.product_name)}<br><span style="color:#6b6157;font-size:12px">${esc(i.product_code)} · ${tk(i.unit_price)} × ${i.quantity}</span></td><td style="${cell};text-align:right;white-space:nowrap">${tk(i.unit_price * i.quantity)}</td></tr>`).join("");
+  const rows = o.items.map((i) => `<tr><td style="${cell}">${esc(i.product_name)}<br><span style="color:#6b6157;font-size:12px">${esc(i.product_code)} · ${tk(i.unit_price)} × ${i.quantity}${i.list_price != null && i.list_price > i.unit_price ? ` <span style="color:#4f6a3d">(special price, regular ${tk(i.list_price)})</span>` : ""}</span></td><td style="${cell};text-align:right;white-space:nowrap">${tk(i.unit_price * i.quantity)}</td></tr>`).join("");
   const line = (k: string, v: string, bold = false) =>
     `<tr><td style="padding:4px 0;color:${bold ? "#231f1b" : "#6b6157"}${bold ? ";font-weight:bold" : ""}">${k}</td><td style="padding:4px 0;text-align:right${bold ? ";font-weight:bold;font-size:17px" : ""}">${v}</td></tr>`;
   const zone = deliveryZone(o.delivery_zone);
@@ -217,6 +217,7 @@ function orderTable(o: Order) {
   <table style="width:100%;border-collapse:collapse;font-size:14px;margin-top:8px">
     ${line("Subtotal", tk(o.subtotal))}
     ${o.discount ? line(`Coupon (${esc(o.coupon_code ?? "")})`, `− ${tk(o.discount)}`) : ""}
+    ${o.admin_discount ? line("Special discount", `− ${tk(o.admin_discount)}`) : ""}
     ${line(`Delivery${zone ? ` (${zone.labelEn})` : ""}`, tk(o.delivery_charge))}
     ${line("Total — Cash on Delivery", tk(o.total), true)}
   </table>

@@ -47,6 +47,7 @@ export default async function EditProduct({ params, searchParams }: Props) {
           {!product.archived && (
             <div className="flex flex-wrap gap-2">
               <ShareProduct url={productUrl} created={!!created} />
+              <Link href={`/admin/coupons?product=${product.id}#bargain`} className={btnQuiet}>দরদামের কুপন</Link>
               <Link href={`/product/${product.slug}`} target="_blank" className={btnQuiet}>সাইটে দেখুন</Link>
             </div>
           )}

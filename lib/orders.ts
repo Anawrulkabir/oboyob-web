@@ -6,7 +6,10 @@ export interface OrderItem {
   product_id: string | null;
   product_code: string;
   product_name: string;
+  /** Price actually charged per piece (may be a bargained price). */
   unit_price: number;
+  /** Catalog price when the order was placed; above unit_price means a special price. */
+  list_price: number | null;
   quantity: number;
 }
 
@@ -22,18 +25,26 @@ export interface Order {
   customer_email: string | null;
   note: string | null;
   coupon_code: string | null;
+  /** Coupon discount. */
   discount: number;
-  delivery_zone: "inside_dhaka" | "outside_dhaka" | null;
+  /** "Special discount" the admin gave (bargaining). */
+  admin_discount: number;
+  delivery_zone: "inside_dhaka" | "outside_dhaka" | "pickup" | null;
   delivery_charge: number;
   subtotal: number | null;
   total: number | null;
   payment_method: "cod";
   slip_token: string;
   emailed_at: string | null;
+  source: "website" | "admin";
+  channel: string | null;
+  /** Internal only — never shown to the customer. */
+  price_note: string | null;
+  priced_at: string | null;
   items: OrderItem[];
 }
 
-export const ORDER_SELECT = "*, items:order_items(id, product_id, product_code, product_name, unit_price, quantity)";
+export const ORDER_SELECT = "*, items:order_items(id, product_id, product_code, product_name, unit_price, list_price, quantity)";
 
 /** Short reference customers see: first 8 characters of the id, uppercase. */
 export const orderRef = (id: string) => id.slice(0, 8).toUpperCase();

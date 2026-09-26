@@ -6,7 +6,8 @@ import { ORDER_STATUSES, ORDER_STATUS_LABEL } from "@/lib/order-status";
 import { formatPrice } from "@/lib/format";
 import { deliveryZone } from "@/lib/delivery";
 import { ORDER_SELECT, orderRef, type Order } from "@/lib/orders";
-import { btnQuiet } from "@/components/admin/styles";
+import { btnPrimary, btnQuiet } from "@/components/admin/styles";
+import { channelLabel } from "@/lib/delivery";
 import PhoneActions from "@/components/admin/PhoneActions";
 
 type Props = { searchParams: Promise<{ status?: string; error?: string }> };
@@ -25,7 +26,10 @@ export default async function OrdersAdmin({ searchParams }: Props) {
 
   return (
     <div>
-      <h1 className="text-2xl">অর্ডার</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl">অর্ডার</h1>
+        <Link href="/admin/orders/new" className={btnPrimary}>+ নতুন অর্ডার (গ্রাহকের হয়ে)</Link>
+      </div>
       <div className="mt-6 flex flex-wrap gap-2">
         {[["সব", ""], ...ORDER_STATUSES.map((s) => [ORDER_STATUS_LABEL[s], s])].map(([label, s]) => (
           <Link key={s} href={s ? `/admin/orders?status=${s}` : "/admin/orders"}
@@ -56,6 +60,10 @@ export default async function OrdersAdmin({ searchParams }: Props) {
                   <span className="text-ink-soft"> · COD{o.delivery_zone && <> · {deliveryZone(o.delivery_zone)?.label}</>}</span>
                 </p>
                 {o.coupon_code && <p className="text-sm text-leaf">কুপন {o.coupon_code} (−{formatPrice(o.discount)})</p>}
+                {o.admin_discount > 0 && <p className="text-sm text-leaf">বিশেষ ছাড় −{formatPrice(o.admin_discount)}</p>}
+                {o.source === "admin" && (
+                  <p className="mt-1 inline-block border border-line px-1.5 py-0.5 text-[11px] text-ink-soft">অ্যাডমিন তৈরি{o.channel && ` · ${channelLabel(o.channel)}`}</p>
+                )}
               </div>
               <div className="text-sm">
                 <p>{o.customer_name}</p>

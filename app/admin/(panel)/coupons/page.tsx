@@ -1,6 +1,7 @@
 import SubmitButton from "@/components/SubmitButton";
 import ConfirmButton from "@/components/admin/ConfirmButton";
 import CouponForm from "@/components/admin/CouponForm";
+import BargainCouponForm, { type BargainProduct } from "@/components/admin/BargainCouponForm";
 import { requireAdmin } from "@/lib/admin";
 import { deleteCoupon, setCouponActive } from "@/app/admin/actions";
 import { formatPrice } from "@/lib/format";
@@ -9,6 +10,7 @@ import { btnQuiet } from "@/components/admin/styles";
 interface Coupon {
   code: string; kind: "percent" | "fixed"; value: number; min_order: number | null; max_discount: number | null;
   usage_limit: number | null; used_count: number; expires_at: string | null; active: boolean;
+  phone: string | null; note: string | null; product: { name: string; product_code: string } | null;
 }
 
 const dateFmt = new Intl.DateTimeFormat("bn-BD", { dateStyle: "medium", timeZone: "Asia/Dhaka" });
@@ -19,6 +21,8 @@ function describe(c: Coupon) {
   const parts = [off];
   if (c.max_discount) parts.push(`সর্বোচ্চ ${formatPrice(c.max_discount)}`);
   if (c.min_order) parts.push(`${formatPrice(c.min_order)}+ অর্ডারে`);
+  if (c.product) parts.push(`শুধু ${c.product.name} (${c.product.product_code})`);
+  if (c.phone) parts.push(`শুধু ${c.phone} নম্বরে`);
   return parts.join(" · ");
 }
 
@@ -29,10 +33,17 @@ function status(c: Coupon): { label: string; tone: string } {
   return { label: "চালু", tone: "text-leaf" };
 }
 
-export default async function CouponsAdmin() {
+type Props = { searchParams: Promise<{ product?: string }> };
+
+export default async function CouponsAdmin({ searchParams }: Props) {
   const { sb } = await requireAdmin();
-  const { data, error } = await sb.from("coupons").select("*").order("created_at", { ascending: false });
-  const coupons = (data ?? []) as Coupon[];
+  const { product: productParam } = await searchParams;
+  const [{ data, error }, { data: productRows }] = await Promise.all([
+    sb.from("coupons").select("*, product:products(name, product_code)").order("created_at", { ascending: false }),
+    sb.from("products").select("id, name, product_code, price").eq("archived", false).order("created_at", { ascending: false }),
+  ]);
+  const coupons = (data ?? []) as unknown as Coupon[];
+  const products: BargainProduct[] = (productRows ?? []).map((p) => ({ id: p.id, name: p.name, code: p.product_code, price: p.price }));
 
   return (
     <div className="space-y-10">
@@ -43,8 +54,13 @@ export default async function CouponsAdmin() {
         </p>
       </div>
 
+      <section id="bargain" className="scroll-mt-6">
+        <BargainCouponForm products={products} initialProductId={productParam} />
+      </section>
+
       <section>
-        <h2 className="mb-4 text-xl">নতুন কুপন</h2>
+        <h2 className="mb-1 text-xl">সবার জন্য কুপন</h2>
+        <p className="mb-4 text-sm text-ink-soft">যেমন ঈদের অফার — যে কেউ কোডটি ব্যবহার করতে পারবে।</p>
         <CouponForm />
       </section>
 
@@ -65,6 +81,7 @@ export default async function CouponsAdmin() {
                       <span className={`ml-3 text-sm ${s.tone}`}>● {s.label}</span>
                     </p>
                     <p className="text-sm text-ink-soft">{describe(c)}</p>
+                    {c.note && <p className="text-xs italic text-ink-soft">“{c.note}”</p>}
                     <p className="text-xs text-ink-soft">
                       ব্যবহার {bn(c.used_count)}{c.usage_limit ? ` / ${bn(c.usage_limit)}` : " (সীমাহীন)"}
                       {c.expires_at && <> · মেয়াদ {dateFmt.format(new Date(c.expires_at))} পর্যন্ত</>}

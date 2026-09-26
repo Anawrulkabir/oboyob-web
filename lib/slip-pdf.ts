@@ -173,7 +173,9 @@ export async function renderSlipPdf(o: Order): Promise<Buffer> {
     const nameW = cols.price - cols.item - 20;
     const top = y + 9;
     let h = text(L, doc, i.product_name, cols.item + 10, top, { size: 10.5, weight: "bold", width: nameW });
-    h += text(L, doc, i.product_code, cols.item + 10, top + h, { size: 8.5, color: C.soft });
+    const special = i.list_price != null && i.list_price > i.unit_price;
+    h += text(L, doc, special ? `${i.product_code} · Special price (regular ${tk(i.list_price)})` : i.product_code,
+      cols.item + 10, top + h, { size: 8.5, color: special ? C.leaf : C.soft });
     text(L, doc, tk(i.unit_price), cols.price, top, { size: 10, width: 80, align: "right" });
     text(L, doc, String(i.quantity), cols.qty, top, { size: 10, width: 30, align: "center" });
     text(L, doc, tk(i.unit_price * i.quantity), cols.amount, top, { size: 10, width: 80, align: "right" });
@@ -192,6 +194,7 @@ export async function renderSlipPdf(o: Order): Promise<Buffer> {
   };
   totalRow("Subtotal", tk(o.subtotal));
   if (o.discount) totalRow(`Coupon (${o.coupon_code})`, `- ${tk(o.discount)}`, C.leaf);
+  if (o.admin_discount) totalRow("Special discount", `- ${tk(o.admin_discount)}`, C.leaf);
   totalRow(`Delivery charge${zone ? ` (${zone.labelEn})` : ""}`, tk(o.delivery_charge));
   y += 4;
   doc.rect(tx - 12, y, 262, 40).fill(C.ink);

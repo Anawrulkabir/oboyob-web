@@ -79,7 +79,10 @@ export default async function OrderSlipPage({ params, searchParams }: Props) {
             <tbody>
               {o.items.map((i) => (
                 <tr key={i.id} className="border-b border-line">
-                  <td className="px-3 py-3"><p className="font-medium">{i.product_name}</p><p className="text-xs text-ink-soft">{i.product_code}</p></td>
+                  <td className="px-3 py-3"><p className="font-medium">{i.product_name}</p><p className="text-xs text-ink-soft">{i.product_code}</p>
+                    {i.list_price != null && i.list_price > i.unit_price && (
+                      <p className="text-xs text-leaf">Special price · regular <span className="line-through">{tk(i.list_price)}</span></p>
+                    )}</td>
                   <td className="px-3 py-3 text-right tabular-nums">{tk(i.unit_price)}</td>
                   <td className="px-3 py-3 text-center tabular-nums">{i.quantity}</td>
                   <td className="px-3 py-3 text-right tabular-nums">{tk(i.unit_price * i.quantity)}</td>
@@ -92,6 +95,7 @@ export default async function OrderSlipPage({ params, searchParams }: Props) {
         <dl className="ml-auto mt-4 w-full max-w-xs space-y-1.5 px-6 text-sm sm:px-8">
           <div className="flex justify-between"><dt className="text-ink-soft">Subtotal</dt><dd className="tabular-nums">{tk(o.subtotal)}</dd></div>
           {o.discount > 0 && <div className="flex justify-between text-leaf"><dt>Coupon ({o.coupon_code})</dt><dd className="tabular-nums">− {tk(o.discount)}</dd></div>}
+          {o.admin_discount > 0 && <div className="flex justify-between text-leaf"><dt>Special discount</dt><dd className="tabular-nums">− {tk(o.admin_discount)}</dd></div>}
           <div className="flex justify-between"><dt className="text-ink-soft">Delivery charge</dt><dd className="tabular-nums">{tk(o.delivery_charge)}</dd></div>
         </dl>
         <div className="mx-6 mt-3 flex items-center justify-between bg-ink px-4 py-3 text-paper sm:mx-8 sm:ml-auto sm:w-80">

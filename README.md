@@ -14,7 +14,7 @@ and the order form tells customers to message on Facebook.
 ## Supabase
 1. SQL editor → run, in order: migrations/0001_init.sql, 0002_admin.sql,
    0003_customers.sql, 0004_stock.sql, 0005_coupons.sql, 0006_cart_checkout.sql,
-   0007_announcements.sql, then seed.sql.
+   0007_announcements.sql, 0008_bargain_admin_orders.sql, then seed.sql.
    Already live? Run only the migrations you haven't run yet, in order.
 2. Set the price (seeded as NULL — not provided):
    update products set price = <TAKA> where product_code = 'OB-C-001';
@@ -60,6 +60,18 @@ What it does:
 - Product URLs are made from the product code (OB-S-002 → /product/ob-s-002).
 - Images: multi-upload straight to Supabase Storage (phone photos are resized
   in the browser), reorder, set main image, alt text, delete.
+- Bargaining (local-shop pricing):
+  - Customer orders on the website at an agreed price → Coupons → "দরদামের
+    কুপন": product + agreed price (+ customer phone) → single-use code worth
+    the difference, only on that product, only with that phone, expires in a
+    few days; copy the ready Messenger message. Also linked from each product.
+  - Customer ordered on Facebook/phone/in person → Orders → "+ নতুন অর্ডার":
+    per-item agreed price, extra discount, delivery zone incl. pickup, custom
+    delivery charge, channel, internal price note. Takes stock like a website
+    order; slip + email work the same. Typing a known phone fills the details.
+  - Any open order → "দাম ও ছাড়": change item prices, special discount and
+    delivery before confirming. Slip/emails show "Special price" and
+    "Special discount". Delivered/cancelled orders are locked.
 - Customers (/admin/customers): everyone who ordered (grouped by phone) plus
   account holders — orders, total spent, last order, search; phone numbers
   have Copy and Call buttons (also on every order).

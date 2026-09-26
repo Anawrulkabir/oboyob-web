@@ -6,6 +6,10 @@ import { emailHtml, notifyStatusChange, sendEmail, slipUrl } from "@/lib/notify"
 import { loadOrder, orderRef } from "@/lib/orders";
 import { renderSlipPdf } from "@/lib/slip-pdf";
 import { announceProduct } from "@/lib/announce";
+import { normalizeBdPhone, toAsciiDigits } from "@/lib/phone";
+import { formatPrice } from "@/lib/format";
+import { deliveryZone, ORDER_CHANNELS } from "@/lib/delivery";
+import { site } from "@/lib/site";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { createSessionClient } from "@/lib/supabase/session";
@@ -357,4 +361,207 @@ export async function deleteCoupon(code: string) {
   const { error } = await sb.from("coupons").delete().eq("code", code);
   if (error) throw new Error(error.message);
   revalidatePath("/admin/coupons");
+}
+
+// ------------------------------------------------------------ bargaining
+export interface BargainState {
+  status: "idle" | "created" | "error";
+  message?: string;
+  errors?: Partial<Record<"product_id" | "agreed_price" | "phone" | "days", string>>;
+  code?: string;
+  /** Ready-made message for Messenger/WhatsApp. */
+  share?: string;
+}
+
+// No 0/O/1/I/L — easy to read out over the phone.
+const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const randomCode = () => "ZN-" + Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
+
+/**
+ * One-customer coupon for a bargained price: "this product for ৳1000
+ * instead of ৳1200" → a single-use code worth the difference, only on that
+ * product and (if given) only with that customer's phone number.
+ */
+export async function createBargainCoupon(_prev: BargainState, form: FormData): Promise<BargainState> {
+  const { sb } = await requireAdmin();
+  const productId = String(form.get("product_id") ?? "");
+  const agreed = Number(toAsciiDigits(String(form.get("agreed_price") ?? "")).trim());
+  const phoneRaw = String(form.get("phone") ?? "").trim();
+  const phone = phoneRaw ? normalizeBdPhone(phoneRaw) : null;
+  const days = Number(String(form.get("days") ?? "3"));
+  const note = String(form.get("note") ?? "").trim().slice(0, 200) || null;
+
+  const { data: product } = await sb.from("products").select("id, name, slug, price").eq("id", productId).maybeSingle();
+  const errors: BargainState["errors"] = {};
+  if (!product) errors.product_id = "পণ্য বাছাই করুন।";
+  else if (product.price == null) errors.product_id = "এই পণ্যের দাম দেওয়া নেই — আগে দাম দিন, অথবা “নতুন অর্ডার” থেকে নিজে অর্ডার করুন।";
+  if (product?.price != null && (!Number.isInteger(agreed) || agreed < 1 || agreed >= product.price))
+    errors.agreed_price = `রাজি হওয়া দাম লিখুন — ${formatPrice(product.price)}-এর কম (যেমন ${Math.round(product.price * 0.85)})।`;
+  if (phoneRaw && !phone) errors.phone = "সঠিক মোবাইল নম্বর লিখুন (01XXXXXXXXX), অথবা খালি রাখুন।";
+  if (![1, 2, 3, 7, 14, 30].includes(days)) errors.days = "মেয়াদ বাছাই করুন।";
+  if (Object.keys(errors).length || !product || product.price == null)
+    return { status: "error", errors, message: "চিহ্নিত ঘরগুলো ঠিক করুন।" };
+
+  const discount = product.price - agreed;
+  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+  expires.setUTCHours(17, 59, 59, 0); // 11:59 pm Dhaka time on the last day
+  let code = "";
+  for (let attempt = 0; attempt < 5 && !code; attempt++) {
+    const candidate = randomCode();
+    const { error } = await sb.from("coupons").insert({
+      code: candidate, kind: "fixed", value: discount, usage_limit: 1, expires_at: expires.toISOString(),
+      phone, product_id: product.id, note,
+    });
+    if (!error) code = candidate;
+    else if (error.code !== "23505") return { status: "error", message: `তৈরি হয়নি: ${error.message}` };
+  }
+  if (!code) return { status: "error", message: "কোড তৈরি হয়নি, আবার চেষ্টা করুন।" };
+  revalidatePath("/admin/coupons");
+
+  const url = `${site.url}/product/${product.slug}`;
+  const until = new Intl.DateTimeFormat("bn-BD", { day: "numeric", month: "long", timeZone: "Asia/Dhaka" }).format(expires);
+  const share =
+    `আপনার জন্য বিশেষ দাম 🎁\n` +
+    `${product.name} — ${formatPrice(agreed)} (নিয়মিত দাম ${formatPrice(product.price)})\n\n` +
+    `১. এই লিংকে যান: ${url}\n` +
+    `২. কার্টে যোগ করে চেকআউট করুন\n` +
+    `৩. “কুপন কোড আছে?”-এ এই কোডটি দিন: ${code}\n` +
+    (phone ? `(কোডটি শুধু ${phone} নম্বর দিয়ে অর্ডারে কাজ করবে)\n` : "") +
+    `কোডটি একবার ব্যবহার করা যাবে, ${until} পর্যন্ত।`;
+  return { status: "created", code, share, message: `কুপন ${code} তৈরি হয়েছে — ${formatPrice(discount)} ছাড়।` };
+}
+
+// --------------------------------------------------- admin-created orders
+export interface CustomerLookup { name: string; address: string | null; email: string | null; orders: number }
+
+/** New-order form: fill in a known customer's details from their phone number. */
+export async function lookupCustomer(rawPhone: string): Promise<CustomerLookup | null> {
+  const { sb } = await requireAdmin();
+  const phone = normalizeBdPhone(rawPhone);
+  if (!phone) return null;
+  const [{ data: last, count }, { data: profile }] = await Promise.all([
+    sb.from("orders").select("customer_name, customer_address, customer_email", { count: "exact" })
+      .eq("customer_phone", phone).order("created_at", { ascending: false }).limit(1),
+    sb.from("profiles").select("full_name, address, email").eq("phone", phone).limit(1).maybeSingle(),
+  ]);
+  const o = last?.[0];
+  if (!o && !profile) return null;
+  return {
+    name: o?.customer_name ?? profile?.full_name ?? "",
+    address: o?.customer_address ?? profile?.address ?? null,
+    email: o?.customer_email ?? profile?.email ?? null,
+    orders: count ?? 0,
+  };
+}
+
+export interface AdminOrderState {
+  status: "idle" | "error";
+  message?: string;
+  errors?: Partial<Record<"items" | "name" | "phone" | "address" | "email" | "delivery_charge" | "admin_discount", string>>;
+}
+
+const toInt = (v: FormDataEntryValue | null) => {
+  const s = toAsciiDigits(String(v ?? "")).trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isInteger(n) ? n : NaN;
+};
+
+/** Map the database's order errors to Bangla messages for the admin. */
+async function adminOrderError(sb: Awaited<ReturnType<typeof requireAdmin>>["sb"], message: string): Promise<string> {
+  const out = message.match(/OUT_OF_STOCK:([^:]+):(\d+)/);
+  if (out) {
+    const { data } = await sb.from("products").select("name").eq("product_code", out[1]).maybeSingle();
+    return `“${data?.name ?? out[1]}” স্টকে আছে মাত্র ${Number(out[2]).toLocaleString("bn-BD")}টি। পণ্যের পেজে স্টক বাড়িয়ে আবার চেষ্টা করুন।`;
+  }
+  const noPrice = message.match(/PRICE_MISSING:(\S+)/);
+  if (noPrice) return `${noPrice[1]} পণ্যের দাম দেওয়া নেই — এই অর্ডারে দামটি লিখুন।`;
+  if (message.includes("DISCOUNT_TOO_BIG")) return "ছাড় পণ্যের মোট দামের চেয়ে বেশি হতে পারে না।";
+  if (message.includes("ORDER_LOCKED")) return "ডেলিভারড বা বাতিল অর্ডারের দাম বদলানো যায় না।";
+  if (message.includes("BAD_PRICE")) return "দাম বা ছাড় ঋণাত্মক হতে পারে না।";
+  if (message.includes("EMPTY_CART")) return "অন্তত একটি পণ্য দিন (পরিমাণ ১–৯৯)।";
+  if (message.includes("PRODUCT_NOT_FOUND")) return "একটি পণ্য পাওয়া যায়নি — পেজটি রিফ্রেশ করুন।";
+  return `সংরক্ষণ হয়নি: ${message}`;
+}
+
+/** Admin places an order for a customer who ordered on Facebook / phone / in person. */
+export async function createAdminOrder(_prev: AdminOrderState, form: FormData): Promise<AdminOrderState> {
+  const { sb } = await requireAdmin();
+  const name = String(form.get("name") ?? "").trim();
+  const phone = normalizeBdPhone(String(form.get("phone") ?? ""));
+  const address = String(form.get("address") ?? "").trim();
+  const email = String(form.get("email") ?? "").trim().toLowerCase();
+  const zone = String(form.get("zone") ?? "");
+  const fee = toInt(form.get("delivery_charge"));
+  const adminDiscount = toInt(form.get("admin_discount")) ?? 0;
+  const channel = ORDER_CHANNELS.some((c) => c.id === form.get("channel")) ? String(form.get("channel")) : "other";
+  const status = form.get("status") === "confirmed" ? "confirmed" : "new";
+
+  let items: { product_id: string; quantity: number; unit_price?: number }[] = [];
+  try {
+    const raw = JSON.parse(String(form.get("items") ?? "[]")) as { product_id: string; quantity: number; unit_price: number | null }[];
+    items = raw.map((l) => ({
+      product_id: String(l.product_id), quantity: Math.floor(Number(l.quantity)),
+      ...(l.unit_price != null && { unit_price: Math.floor(Number(l.unit_price)) }),
+    }));
+  } catch {}
+
+  const errors: AdminOrderState["errors"] = {};
+  if (!items.length) errors.items = "অন্তত একটি পণ্য যোগ করুন।";
+  if (items.some((l) => !(l.quantity >= 1) || (l.unit_price != null && !(l.unit_price >= 0)))) errors.items = "পরিমাণ ও দাম ঠিক করুন।";
+  if (name.length < 2) errors.name = "গ্রাহকের নাম লিখুন।";
+  if (!phone) errors.phone = "সঠিক মোবাইল নম্বর লিখুন (01XXXXXXXXX)।";
+  if (zone !== "pickup" && address.length < 5) errors.address = "ডেলিভারির ঠিকানা লিখুন।";
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errors.email = "ইমেইলটি সঠিক নয়, অথবা খালি রাখুন।";
+  if (Number.isNaN(fee) || (fee != null && fee < 0)) errors.delivery_charge = "ডেলিভারি চার্জ পূর্ণ টাকায় লিখুন।";
+  if (Number.isNaN(adminDiscount) || adminDiscount < 0) errors.admin_discount = "ছাড় পূর্ণ টাকায় লিখুন।";
+  if (Object.keys(errors).length) return { status: "error", errors, message: "চিহ্নিত ঘরগুলো ঠিক করুন।" };
+
+  const { data, error } = await sb.rpc("admin_create_order", {
+    p_items: items,
+    p_zone: deliveryZone(zone) ? zone : "inside_dhaka",
+    p_delivery_charge: fee,
+    p_admin_discount: adminDiscount,
+    p_customer_name: name.slice(0, 120),
+    p_customer_phone: phone,
+    p_customer_address: (address || "পিকআপ / হাতে হাতে").slice(0, 500),
+    p_customer_email: email || null,
+    p_note: String(form.get("note") ?? "").trim().slice(0, 1000) || null,
+    p_price_note: String(form.get("price_note") ?? "").trim().slice(0, 500) || null,
+    p_channel: channel,
+    p_status: status,
+  });
+  if (error || !data) return { status: "error", message: await adminOrderError(sb, error?.message ?? "") };
+  refreshSite(); // stock changed
+  revalidatePath("/admin/orders", "layout");
+  redirect(`/admin/orders/${(data as { id: string }).id}?created=1${status === "confirmed" ? "&compose=1" : ""}`);
+}
+
+export interface PricingState { status: "idle" | "saved" | "error"; message?: string }
+
+/** Order page: agreed prices, special discount and delivery for one order. */
+export async function updateOrderPricing(orderId: string, _prev: PricingState, form: FormData): Promise<PricingState> {
+  const { sb } = await requireAdmin();
+  const prices: { item_id: string; unit_price: number }[] = [];
+  for (const [key, value] of form.entries()) {
+    if (!key.startsWith("price:")) continue;
+    const n = toInt(value);
+    if (n == null || Number.isNaN(n) || n < 0) return { status: "error", message: "প্রতিটি পণ্যের দাম পূর্ণ টাকায় লিখুন।" };
+    prices.push({ item_id: key.slice(6), unit_price: n });
+  }
+  const discount = toInt(form.get("admin_discount")) ?? 0;
+  const fee = toInt(form.get("delivery_charge"));
+  const zone = String(form.get("zone") ?? "");
+  if (Number.isNaN(discount) || discount < 0) return { status: "error", message: "ছাড় পূর্ণ টাকায় লিখুন।" };
+  if (Number.isNaN(fee) || (fee != null && fee < 0)) return { status: "error", message: "ডেলিভারি চার্জ পূর্ণ টাকায় লিখুন।" };
+  if (!deliveryZone(zone)) return { status: "error", message: "ডেলিভারি এলাকা বাছাই করুন।" };
+
+  const { error } = await sb.rpc("admin_update_order_pricing", {
+    p_order_id: orderId, p_prices: prices, p_admin_discount: discount,
+    p_zone: zone, p_delivery_charge: fee, p_price_note: String(form.get("price_note") ?? "").trim().slice(0, 500),
+  });
+  if (error) return { status: "error", message: await adminOrderError(sb, error.message) };
+  revalidatePath(`/admin/orders/${orderId}`);
+  revalidatePath("/admin/orders");
+  return { status: "saved", message: "দাম সংরক্ষিত হয়েছে। স্লিপ ও ইমেইলে নতুন মোট দেখাবে।" };
 }

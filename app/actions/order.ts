@@ -8,7 +8,7 @@ import { createSessionClient } from "@/lib/supabase/session";
 import { normalizeBdPhone } from "@/lib/phone";
 import { notifyNewOrder } from "@/lib/notify";
 import { COUPON_CODE, couponErrorMessage, normalizeCouponCode } from "@/lib/coupon";
-import { deliveryZone } from "@/lib/delivery";
+import { checkoutZone } from "@/lib/delivery";
 import { loadOrder } from "@/lib/orders";
 
 export type CheckoutField = "name" | "phone" | "address" | "email" | "zone" | "coupon";
@@ -49,7 +49,7 @@ export async function placeOrder(_prev: CheckoutState, form: FormData): Promise<
   const address = String(form.get("address") ?? "").trim();
   const note = String(form.get("note") ?? "").trim().slice(0, 1000);
   const emailRaw = String(form.get("email") ?? "").trim().toLowerCase();
-  const zone = deliveryZone(String(form.get("zone") ?? ""));
+  const zone = checkoutZone(String(form.get("zone") ?? ""));
   const coupon = normalizeCouponCode(String(form.get("coupon") ?? ""));
 
   if (!lines.length) return { status: "error", message: "কার্ট খালি। আগে পণ্য যোগ করুন।" };
@@ -133,21 +133,17 @@ export async function placeOrder(_prev: CheckoutState, form: FormData): Promise<
 
 export interface CouponCheck { ok: boolean; code?: string; discount?: number; message?: string }
 
-/** Checkout "Apply" button: what this code takes off this cart. Doesn't use up the coupon. */
-export async function checkCoupon(rawCode: string, lines: CartLine[]): Promise<CouponCheck> {
+/**
+ * Checkout "Apply" button: what this code takes off this cart. Doesn't use up
+ * the coupon. The phone matters for personal (bargain) coupons.
+ */
+export async function checkCoupon(rawCode: string, lines: CartLine[], rawPhone: string): Promise<CouponCheck> {
   const code = normalizeCouponCode(rawCode);
   if (!COUPON_CODE.test(code)) return { ok: false, message: "কুপন কোডটি সঠিক নয়।" };
   const db = getServiceClient();
   if (!db) return { ok: false, message: "এখন কুপন যাচাই করা যাচ্ছে না।" };
-  // Subtotal from current catalog prices, not from the browser.
-  const catalog = new Map((await getProducts()).map((p) => [p.id, p]));
-  let subtotal = 0;
-  for (const l of lines.slice(0, 20)) {
-    const price = catalog.get(l.id)?.price;
-    if (price == null) return { ok: false, message: "কার্টের একটি পণ্যের দাম পাওয়া যায়নি।" };
-    subtotal += price * Math.min(20, Math.max(1, Math.floor(l.qty) || 1));
-  }
-  const { data, error } = await db.rpc("check_coupon", { p_code: code, p_subtotal: subtotal });
+  const items = lines.slice(0, 20).map((l) => ({ product_id: l.id, quantity: Math.min(20, Math.max(1, Math.floor(l.qty) || 1)) }));
+  const { data, error } = await db.rpc("check_coupon", { p_code: code, p_items: items, p_phone: normalizeBdPhone(rawPhone) ?? "" });
   if (error) return { ok: false, message: couponErrorMessage(error.message) ?? "এখন কুপন যাচাই করা যাচ্ছে না।" };
   return { ok: true, code, discount: Number(data) };
 }
