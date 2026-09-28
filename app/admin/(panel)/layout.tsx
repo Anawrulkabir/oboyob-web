@@ -18,11 +18,12 @@ export default async function PanelLayout({ children }: { children: React.ReactN
             <span className="font-display text-lg">জীনাহ</span>
             <span className="text-sm text-ink-soft">Admin</span>
           </Link>
-          <nav className="flex gap-5">
+          <nav className="flex flex-wrap gap-x-5 gap-y-1">
             <Link href="/admin" className="hover:text-haldi">পণ্য</Link>
             <Link href="/admin/orders" className="hover:text-haldi">অর্ডার</Link>
             <Link href="/admin/customers" className="hover:text-haldi">গ্রাহক</Link>
             <Link href="/admin/coupons" className="hover:text-haldi">কুপন</Link>
+            <Link href="/admin/visitors" className="hover:text-haldi">ভিজিটর</Link>
             <Link href="/" target="_blank" className="text-ink-soft hover:text-ink">সাইট দেখুন</Link>
           </nav>
           <form action={signOut} className="ml-auto flex items-center gap-3 text-sm text-ink-soft">

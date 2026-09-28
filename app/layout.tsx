@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Bengali, Tiro_Bangla } from "next/font/google";
 import { site } from "@/lib/site";
 import NavProgress from "@/components/NavProgress";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 // Tiro Bangla: a calligraphic Bangla serif for headings (single weight — never faux-bold it).
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="flex min-h-dvh flex-col antialiased">
         <NavProgress />
         {children}
+        <Analytics />
       </body>
     </html>
   );
