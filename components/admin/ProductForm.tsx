@@ -48,6 +48,7 @@ export default function ProductForm({ product }: { product?: Product }) {
   const e = state.errors ?? {};
   const formRef = useRef<HTMLFormElement>(null);
   const [photos, setPhotos] = useState<string[]>([]);
+  const [photosBusy, setPhotosBusy] = useState(false);
   const [draft, setDraft] = useState<Product>(() => draftFrom(null, product, []));
   const refresh = (nextPhotos = photos) => setDraft(draftFrom(formRef.current, product, nextPhotos));
   const previewDialog = useRef<HTMLDialogElement>(null);
@@ -67,7 +68,7 @@ export default function ProductForm({ product }: { product?: Product }) {
     >
       {!product && (
         <>
-          <DraftPhotos urls={photos} onChange={(u) => { setPhotos(u); refresh(u); }} />
+          <DraftPhotos urls={photos} onChange={(u) => { setPhotos(u); refresh(u); }} onBusyChange={setPhotosBusy} />
           <input type="hidden" name="images" value={JSON.stringify(photos)} />
         </>
       )}
@@ -140,11 +141,12 @@ export default function ProductForm({ product }: { product?: Product }) {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 border-t border-line pt-6">
-        <button disabled={pending} className={btnPrimary}>
-          {pending ? "সংরক্ষণ হচ্ছে…" : product ? "পরিবর্তন সংরক্ষণ করুন" : "পণ্য তৈরি করুন"}
+      {/* On phones the save button stays pinned to the bottom of the screen. */}
+      <div className="sticky bottom-0 z-10 -mx-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line bg-paper px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:pt-6">
+        <button disabled={pending || photosBusy} className={`${btnPrimary} min-h-11 flex-1 sm:flex-none`}>
+          {pending ? "সংরক্ষণ হচ্ছে…" : photosBusy ? "ছবি আপলোড শেষ হওয়ার অপেক্ষা…" : product ? "পরিবর্তন সংরক্ষণ করুন" : "পণ্য তৈরি করুন"}
         </button>
-        <button type="button" onClick={() => { refresh(); previewDialog.current?.showModal(); }} className={`${btnQuiet} lg:hidden`}>
+        <button type="button" onClick={() => { refresh(); previewDialog.current?.showModal(); }} className={`${btnQuiet} min-h-11 lg:hidden`}>
           প্রিভিউ দেখুন
         </button>
         <Link href="/admin" className="text-ink-soft underline underline-offset-4">বাতিল</Link>

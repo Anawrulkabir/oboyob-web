@@ -1,35 +1,28 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { discardUpload } from "@/app/admin/actions";
-import { uploadProductImage } from "./upload";
-import { btnQuiet } from "./styles";
+import { AddPhotosTile, UploadSummary, UploadTile, useUploadQueue } from "./UploadQueue";
+
+const tinyBtn = "flex min-h-10 min-w-10 flex-1 items-center justify-center border border-line text-sm text-ink-soft hover:border-ink hover:text-ink active:bg-paper-deep disabled:opacity-30";
 
 // Photo picker for a product that doesn't exist yet: photos upload right
 // away to drafts/…, and their URLs go with the form as `images`.
-export default function DraftPhotos({ urls, onChange }: { urls: string[]; onChange: (urls: string[]) => void }) {
-  const input = useRef<HTMLInputElement>(null);
+export default function DraftPhotos({ urls, onChange, onBusyChange }: {
+  urls: string[]; onChange: (urls: string[]) => void; onBusyChange?: (busy: boolean) => void;
+}) {
   const folder = useRef(`drafts/${crypto.randomUUID()}`);
-  const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Several photos finish independently, so append to the latest list, not a stale one.
+  const latest = useRef(urls);
+  latest.current = urls;
+  const queue = useUploadQueue(folder.current, (url) => {
+    const next = [...latest.current, url];
+    latest.current = next;
+    onChange(next);
+  });
 
-  async function upload(files: FileList) {
-    setError(null);
-    const list = Array.from(files);
-    let next = urls;
-    for (const [i, file] of list.entries()) {
-      setStatus(`আপলোড হচ্ছে ${i + 1}/${list.length}…`);
-      try {
-        next = [...next, await uploadProductImage(file, folder.current)];
-        onChange(next);
-      } catch (err) {
-        setError((err as Error).message);
-      }
-    }
-    setStatus(null);
-    if (input.current) input.current.value = "";
-  }
+  useEffect(() => onBusyChange?.(queue.busy), [queue.busy, onBusyChange]);
 
   const move = (i: number, to: number) => {
     const next = [...urls];
@@ -44,35 +37,31 @@ export default function DraftPhotos({ urls, onChange }: { urls: string[]; onChan
 
   return (
     <section>
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <span className="text-sm text-ink-soft">ছবি</span>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="text-sm text-ink-soft">ছবি {urls.length > 0 && `(${urls.length})`}</span>
         <span className="text-xs text-ink-soft">প্রথম ছবিটি মূল ছবি। ৪:৫ (খাড়া) ছবি সবচেয়ে ভালো দেখায়।</span>
       </div>
-      <ul className="mt-2 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+      <UploadSummary items={queue.items} />
+      <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
         {urls.map((url, i) => (
           <li key={url} className="border border-line">
             <div className="relative aspect-[4/5] bg-paper-deep">
-              <Image src={url} alt="" fill sizes="160px" className="object-cover" />
+              <Image src={url} alt="" fill sizes="(max-width: 640px) 50vw, 160px" className="object-cover" />
               {i === 0 && <span className="absolute left-1.5 top-1.5 bg-ink px-1.5 py-0.5 text-[11px] text-paper">মূল ছবি</span>}
             </div>
-            <div className="flex flex-wrap gap-1 p-1.5">
-              {i > 0 && <button type="button" onClick={() => move(i, 0)} className={`${btnQuiet} !px-2 !py-1 !text-xs`}>মূল</button>}
-              <button type="button" disabled={i === 0} onClick={() => move(i, i - 1)} className={`${btnQuiet} !px-2 !py-1 !text-xs`} aria-label="আগে">←</button>
-              <button type="button" disabled={i === urls.length - 1} onClick={() => move(i, i + 1)} className={`${btnQuiet} !px-2 !py-1 !text-xs`} aria-label="পরে">→</button>
-              <button type="button" onClick={() => remove(i)} className={`${btnQuiet} !px-2 !py-1 !text-xs !text-sindoor`} aria-label="ছবি সরান">✕</button>
+            <div className="flex gap-1 p-1.5">
+              {i > 0 && <button type="button" onClick={() => move(i, 0)} className={tinyBtn} aria-label="মূল ছবি করুন">★</button>}
+              <button type="button" disabled={i === 0} onClick={() => move(i, i - 1)} className={tinyBtn} aria-label="আগে">←</button>
+              <button type="button" disabled={i === urls.length - 1} onClick={() => move(i, i + 1)} className={tinyBtn} aria-label="পরে">→</button>
+              <button type="button" onClick={() => remove(i)} className={`${tinyBtn} !text-sindoor`} aria-label="ছবি সরান">✕</button>
             </div>
           </li>
         ))}
-        <li>
-          <label className="flex aspect-[4/5] cursor-pointer flex-col items-center justify-center gap-1 border border-dashed border-ink-soft p-2 text-center text-xs text-ink-soft hover:border-ink hover:text-ink">
-            <span className="text-2xl">+</span>
-            {status ?? "ছবি যোগ করুন"}
-            <input ref={input} type="file" accept="image/*" multiple disabled={!!status} className="sr-only"
-              onChange={(e) => e.target.files?.length && upload(e.target.files)} />
-          </label>
-        </li>
+        {queue.items.map((item) => (
+          <UploadTile key={item.id} item={item} onRetry={() => queue.retry(item.id)} onDismiss={() => queue.dismiss(item.id)} />
+        ))}
+        <AddPhotosTile onFiles={queue.addFiles} count={urls.length + queue.items.length} />
       </ul>
-      {error && <p role="alert" className="mt-2 text-sm text-sindoor">{error}</p>}
     </section>
   );
 }

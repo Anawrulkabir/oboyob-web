@@ -1,10 +1,10 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import SubmitButton from "@/components/SubmitButton";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { uploadProductImage } from "./upload";
+import { AddPhotosTile, UploadSummary, UploadTile, useUploadQueue } from "./UploadQueue";
 import { addImage, deleteImage, moveImage, updateAltText } from "@/app/admin/actions";
 import type { ProductImage } from "@/types/product";
 import { adminInput, btnQuiet } from "./styles";
@@ -13,26 +13,13 @@ export default function ImageManager({ productId, productName, images }: {
   productId: string; productName: string; images: ProductImage[];
 }) {
   const router = useRouter();
-  const input = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
-
-  async function upload(files: FileList) {
-    setError(null);
-    const list = Array.from(files);
-    for (const [i, file] of list.entries()) {
-      setStatus(`আপলোড হচ্ছে ${i + 1}/${list.length}…`);
-      try {
-        await addImage(productId, await uploadProductImage(file, productId), productName);
-      } catch (err) {
-        setError((err as Error).message);
-      }
-    }
-    setStatus(null);
-    if (input.current) input.current.value = "";
+  // Each photo is saved to the product as soon as it lands; the grid refreshes to show it.
+  const queue = useUploadQueue(productId, async (url) => {
+    await addImage(productId, url, productName);
     router.refresh();
-  }
+  });
 
   const run = (fn: () => Promise<unknown>) =>
     startTransition(async () => {
@@ -46,7 +33,8 @@ export default function ImageManager({ productId, productName, images }: {
         <p className="text-xs text-ink-soft">প্রথম ছবিটি মূল ছবি। ৪:৫ (খাড়া) ছবি সবচেয়ে ভালো দেখায়।</p>
       </div>
 
-      <ul className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      <UploadSummary items={queue.items} />
+      <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
         {images.map((img, i) => (
           <li key={img.id} className="border border-line">
             <div className="relative aspect-[4/5] bg-paper-deep">
@@ -59,14 +47,14 @@ export default function ImageManager({ productId, productName, images }: {
                 <SubmitButton className={btnQuiet} title="বিবরণ সংরক্ষণ">✓</SubmitButton>
               </form>
               <div className="flex flex-wrap gap-1">
-                {i > 0 && <button type="button" disabled={busy} onClick={() => run(() => moveImage(productId, img.id, "first"))} className={btnQuiet}>মূল করুন</button>}
-                <button type="button" disabled={busy || i === 0} onClick={() => run(() => moveImage(productId, img.id, "up"))} className={btnQuiet} aria-label="আগে">←</button>
-                <button type="button" disabled={busy || i === images.length - 1} onClick={() => run(() => moveImage(productId, img.id, "down"))} className={btnQuiet} aria-label="পরে">→</button>
+                {i > 0 && <button type="button" disabled={busy} onClick={() => run(() => moveImage(productId, img.id, "first"))} className={`${btnQuiet} min-h-10`}>মূল করুন</button>}
+                <button type="button" disabled={busy || i === 0} onClick={() => run(() => moveImage(productId, img.id, "up"))} className={`${btnQuiet} min-h-10 min-w-10`} aria-label="আগে">←</button>
+                <button type="button" disabled={busy || i === images.length - 1} onClick={() => run(() => moveImage(productId, img.id, "down"))} className={`${btnQuiet} min-h-10 min-w-10`} aria-label="পরে">→</button>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => confirm("ছবিটি মুছে ফেলবেন?") && run(() => deleteImage(img.id))}
-                  className={`${btnQuiet} !text-sindoor`}
+                  className={`${btnQuiet} min-h-10 !text-sindoor`}
                 >
                   মুছুন
                 </button>
@@ -75,21 +63,10 @@ export default function ImageManager({ productId, productName, images }: {
           </li>
         ))}
 
-        <li>
-          <label className="flex aspect-[4/5] cursor-pointer flex-col items-center justify-center gap-2 border border-dashed border-ink-soft text-center text-sm text-ink-soft hover:border-ink hover:text-ink">
-            <span className="text-2xl">+</span>
-            {status ?? "ছবি যোগ করুন"}
-            <input
-              ref={input}
-              type="file"
-              accept="image/*"
-              multiple
-              disabled={!!status}
-              className="sr-only"
-              onChange={(e) => e.target.files?.length && upload(e.target.files)}
-            />
-          </label>
-        </li>
+        {queue.items.map((item) => (
+          <UploadTile key={item.id} item={item} onRetry={() => queue.retry(item.id)} onDismiss={() => queue.dismiss(item.id)} />
+        ))}
+        <AddPhotosTile onFiles={queue.addFiles} count={images.length + queue.items.length} />
       </ul>
       {error && <p role="alert" className="mt-3 text-sm text-sindoor">{error}</p>}
     </section>
