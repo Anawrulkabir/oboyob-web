@@ -5,6 +5,7 @@ import { orderForSlip } from "@/lib/order-access";
 import { orderRef } from "@/lib/orders";
 import { deliveryZone } from "@/lib/delivery";
 import { site } from "@/lib/site";
+import { PixelPurchase } from "@/components/MetaPixel";
 
 export const metadata: Metadata = { title: "Payment slip", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -25,6 +26,10 @@ export default async function OrderSlipPage({ params, searchParams }: Props) {
 
   return (
     <div className="mx-auto max-w-3xl px-5 pt-8 sm:px-8 md:pt-12">
+      {o.source !== "admin" && (
+        <PixelPurchase orderId={o.id} createdAt={o.created_at} value={o.total ?? 0}
+          items={o.items.map((i) => ({ code: i.product_code, qty: i.quantity, price: i.unit_price }))} />
+      )}
       <div className="text-center">
         <p className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-leaf/10 text-2xl text-leaf" aria-hidden>✓</p>
         <h1 className="mt-4 text-3xl sm:text-4xl">ধন্যবাদ, অর্ডার পেয়েছি!</h1>

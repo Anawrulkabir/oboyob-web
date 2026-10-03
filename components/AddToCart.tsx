@@ -6,6 +6,7 @@ import type { Product } from "@/types/product";
 import { useCart } from "@/lib/cart";
 import { site } from "@/lib/site";
 import QtyStepper from "./QtyStepper";
+import { track } from "@/lib/pixel";
 
 export default function AddToCart({ product }: { product: Product }) {
   const cart = useCart();
@@ -41,7 +42,12 @@ export default function AddToCart({ product }: { product: Product }) {
     id: product.id, slug: product.slug, name: product.name, code: product.product_code,
     price: product.price, image: product.images[0]?.image_url ?? null, stock: product.stock,
   };
-  const add = () => { cart.add(item, qty); setAdded(true); setQty(1); };
+  const add = () => {
+    const n = Math.min(qty, max);
+    cart.add(item, qty);
+    track("AddToCart", { content_ids: [product.product_code], content_name: product.name, content_type: "product", value: product.price! * n, currency: "BDT" });
+    setAdded(true); setQty(1);
+  };
 
   return (
     <div className="space-y-4">

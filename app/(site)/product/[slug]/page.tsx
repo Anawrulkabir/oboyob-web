@@ -4,6 +4,7 @@ import ProductGallery from "@/components/ProductGallery";
 import ProductInfo from "@/components/ProductInfo";
 import ProductSpecifications from "@/components/ProductSpecifications";
 import AddToCart from "@/components/AddToCart";
+import { PixelViewContent } from "@/components/MetaPixel";
 import StickyOrderBar from "@/components/StickyOrderBar";
 import { formatPrice, PRICE_ON_REQUEST } from "@/lib/format";
 import { getProductBySlug, getProducts } from "@/lib/products";
@@ -63,6 +64,7 @@ export default async function ProductPage({ params }: Props) {
   return (
     <article className="mx-auto max-w-6xl px-5 pt-6 sm:px-8 md:pt-12">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <PixelViewContent code={product.product_code} name={product.name} price={product.price} />
 
       <div className="grid gap-10 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:gap-14">
         <div className="-mx-5 sm:mx-0 md:sticky md:top-24 md:self-start">

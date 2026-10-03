@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, startTransition } from "react";
+import { track } from "@/lib/pixel";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -94,6 +95,17 @@ export default function CheckoutForm({ enabled }: { enabled: boolean }) {
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [linesKey, f.phone]);
+
+  // Meta Pixel: "started checkout", once per visit to this page.
+  const checkoutTracked = useRef(false);
+  useEffect(() => {
+    if (checkoutTracked.current || !cart.ready || !cart.items.length) return;
+    checkoutTracked.current = true;
+    track("InitiateCheckout", {
+      value: cart.subtotal, currency: "BDT", content_type: "product",
+      content_ids: cart.items.map((i) => i.code), num_items: cart.items.reduce((n, i) => n + i.qty, 0),
+    });
+  }, [cart.ready, cart.items, cart.subtotal]);
 
   const fee = DELIVERY_ZONES.find((z) => z.id === zone)?.fee ?? null;
   const discount = coupon?.discount ?? 0;

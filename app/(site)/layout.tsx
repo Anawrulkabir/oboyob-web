@@ -2,6 +2,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { CartProvider } from "@/lib/cart";
 import VisitTracker from "@/components/VisitTracker";
+import MetaPixel from "@/components/MetaPixel";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <main id="main" className="flex-1">{children}</main>
       <Footer />
       <VisitTracker />
+      <MetaPixel />
     </CartProvider>
   );
 }
